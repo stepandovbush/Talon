@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Talon is an AI agent that escalates stuck support conversations past bots to real people, and finds the right contact for anything else you're trying to do.">
+<title>Talon: skip the bot, reach a human</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f4f4f3;
+    --panel-2: #ececea;
+    --border: #e4e4e1;
+    --text: #111110;
+    --muted: #6b6b68;
+    --accent: #111110;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  /* Nav */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0 10px;
+  }
+  .logo {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .logo img { height: 17px; width: auto; display: block; }
+  .nav-links {
+    display: flex;
+    gap: 32px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .nav-links a { color: inherit; text-decoration: none; }
+  .nav-links a:hover { color: var(--text); }
+  .nav-actions { display: flex; gap: 10px; }
+  .btn {
+    font-size: 14px;
+    font-weight: 500;
+    padding: 9px 18px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-block;
+  }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* Hero */
+  header.hero {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 40px;
+    align-items: end;
+    padding: 64px 0 48px;
+  }
+  h1 {
+    font-size: 56px;
+    line-height: 1.05;
+    margin: 0 0 24px;
+    letter-spacing: -0.03em;
+    font-weight: 600;
+  }
+  .hero-sub { color: var(--muted); font-size: 16px; max-width: 380px; margin-bottom: 24px; }
+  .hero-actions { display: flex; gap: 10px; }
+
+  /* Product panel */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 8px;
+    margin-bottom: 64px;
+  }
+  .panel-body {
+    background: var(--bg);
+    border-radius: 18px;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+    height: 410px;
+  }
+  .inbox-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .inbox-head strong { color: var(--text); font-weight: 600; }
+  .inbox-list { padding: 4px 0; }
+  .inbox-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 22px;
+    border-bottom: 1px solid var(--border);
+  }
+  .inbox-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--panel-2);
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: var(--muted); font-weight: 600;
+  }
+  .inbox-main { flex: 1; min-width: 0; }
+  .inbox-to { font-size: 13.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .inbox-subject { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .inbox-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
+  .inbox-time { font-size: 11.5px; color: var(--muted); }
+  .status-pill { font-size: 10.5px; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .status-pill.waiting { background: var(--panel-2); color: var(--muted); }
+  .status-pill.replied { background: var(--accent); color: #fff; }
+  .panel-body::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 70px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), var(--bg));
+    pointer-events: none;
+  }
+
+  .panel-caption {
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+    padding: 16px 8px 4px;
+  }
+
+  /* Sections */
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 24px; }
+  h2 { font-size: 28px; margin: 0 0 32px; letter-spacing: -0.02em; }
+  .how-sub { color: var(--muted); font-size: 15px; max-width: 640px; margin: -16px 0 28px; }
+  .placeholder-block { margin-top: 4px; }
+  .placeholder-block .screen-body { height: 220px; }
+
+  .arch-diagram {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 16px;
+    margin-top: 4px;
+  }
+  .arch-diagram svg { width: 100%; height: auto; display: block; }
+  .arch-node {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    padding: 0 14px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .arch-icon {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 8px;
+  }
+  .arch-icon.dark { background: var(--text); color: #fff; border-color: var(--text); }
+  .arch-title { font-weight: 600; font-size: 15px; color: var(--text); }
+  .arch-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .arch-sub-icon {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text);
+  }
+  .arch-caption { text-align: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  .arch-name { font-weight: 600; font-size: 12.5px; color: var(--text); margin-bottom: 4px; }
+  .arch-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .card .n { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 10px; }
+  .card h3 { font-size: 17px; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  /* Problem scroll-reveal section */
+  .problem-track { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .problem-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .problem-card.visible { opacity: 1; transform: translateY(0); }
+  .problem-card { display: flex; flex-direction: column; }
+  .problem-card .mock {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+    height: 112px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .problem-card h3 { font-size: 15px; margin: 0 0 4px; }
+  .problem-card p { margin: 0; color: var(--muted); font-size: 13px; }
+
+  /* mock: inbox */
+  .mock-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .mock-row:last-child { border-bottom: none; }
+  .mock-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--panel-2); flex-shrink: 0; }
+  .mock-lines { flex: 1; }
+  .mock-line { height: 6px; border-radius: 3px; background: var(--panel-2); margin-bottom: 4px; }
+  .mock-line.short { width: 55%; }
+  .mock-line.long { width: 85%; }
+
+  /* mock: profile grid */
+  .mock-profiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .mock-profile { text-align: center; }
+  .mock-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--panel-2); margin: 0 auto 6px; }
+  .mock-profile .mock-line { margin: 0 auto 3px; }
+
+  /* mock: contact form */
+  .mock-field { height: 24px; border-radius: 6px; background: var(--panel-2); margin-bottom: 8px; }
+  .mock-field.btn-like { background: var(--accent); width: 40%; }
+
+  .demo {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .bubble {
+    max-width: 78%;
+    padding: 12px 16px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+    font-size: 14px;
+  }
+  .bubble.bot { background: var(--panel-2); color: var(--muted); border-bottom-left-radius: 4px; }
+  .bubble.agent { background: var(--accent); color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
+  .bubble.human { background: var(--panel-2); color: var(--text); border-bottom-left-radius: 4px; }
+  .bubble .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.6; margin-bottom: 4px; display: block; }
+
+  /* Two views section */
+  .views-intro { margin-bottom: 24px; }
+  .views-intro .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .views-intro h3 { font-size: 18px; margin: 0 0 6px; }
+  .views-intro p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  .views-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .screen {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .screen-bar {
+    display: flex;
+    gap: 6px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .screen-bar span { width: 8px; height: 8px; border-radius: 50%; background: var(--panel-2); }
+  .screen-body {
+    height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 13px;
+    background: repeating-linear-gradient(135deg, var(--bg), var(--bg) 10px, var(--panel) 10px, var(--panel) 11px);
+  }
+
+  .stack { display: flex; gap: 10px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--border); color: var(--muted); font-size: 13px; padding: 7px 14px; border-radius: 999px; background: var(--panel); }
+
+  footer { padding: 48px 0 80px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 760px) {
+    header.hero { grid-template-columns: 1fr; }
+    h1 { font-size: 38px; }
+    .grid3, .problem-track, .views-panel, .views-intro .grid2 { grid-template-columns: 1fr; }
+    .nav-links { display: none; }
+    .panel-body { flex-wrap: wrap; }
+    .orb.sm, .orb.md { display: none; }
+    .panel-labels span.sm, .panel-labels span.md { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <nav>
+      <div class="logo"><img src="assets/logo.png" alt="Talon logo">Talon</div>
+      <div class="nav-links">
+        <a href="#how">How it works</a>
+        <a href="#problem">The problem</a>
+        <a href="#build">Built with</a>
+      </div>
+      <div class="nav-actions" id="nav-actions">
+        <a class="btn" href="https://github.com/stepandovbush/Talon" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn primary" href="signup.html" id="nav-signup">Sign up</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div>
+        <h1>Skip the bot.<br>Find who can help.</h1>
+      </div>
+      <div>
+        <p class="hero-sub">
+          Talon is an AI agent that gets you to the right person. Give it a stuck
+          support conversation and it pushes past the bot until a human responds.
+          Give it a topic, like every tech partnership available, and it researches
+          the options, then hands you the emails, ticket systems, and contacts you'd
+          actually need to reach out.
+        </p>
+      </div>
+    </header>
+
+    <div class="panel">
+      <div class="panel-body">
+        <div class="inbox-head"><strong>Sent</strong><span>1–8 of 41</span></div>
+        <div class="inbox-list">
+          <div class="inbox-row">
+            <div class="inbox-avatar">N</div>
+            <div class="inbox-main">
+              <div class="inbox-to">To: support@northwind.com</div>
+              <div class="inbox-subject">Following up on ticket #4821, still waiting</div>
+            </div>
+            <div class="inbox-meta"><span class="inbox-time">6d</span><span class="status-pill waiting">No reply</span></div>
+          </div>
+          <div class="inbox-row">
+            <div class="inbox-avatar">F</div>
+            <div class="inbox-main">
+              <div class="inbox-to">To: billing@fiberlink.com</div>
+              <div class="inbox-subject">Second follow-up, no update since Tuesday</div>
+            </div>
+            <div class="inbox-meta"><span class="inbox-time">4d</span><span class="status-pill waiting">No reply</span></div>
+          </div>
+          <div class="inbox-row">
+            <div class="inbox-avatar">M</div>
+            <div class="inbox-main">
+              <div class="inbox-to">To: care@meridianbank.com</div>
+              <div class="inbox-subject">Re: locked account, can you confirm?</div>
+            </div>
+            <div class="inbox-meta"><span class="inbox-time">2h</span><span class="status-pill replied">Replied</span></div>
+          </div>
+          <div class="inbox-row">
+            <div class="inbox-avatar">A</div>
+            <div class="inbox-main">
+              <div class="inbox-to">To: hello@acmeinternet.com</div>
+              <div class="inbox-subject">Any update on my refund request?</div>
+            </div>
+            <div class="inbox-meta"><span class="inbox-time">9d</span><span class="status-pill waiting">No reply</span></div>
+          </div>
+          <div class="inbox-row">
+            <div class="inbox-avatar">B</div>
+            <div class="inbox-main">
+              <div class="inbox-to">To: support@brightwave.io</div>
+              <div class="inbox-subject">Third email, please advise on my case</div>
+            </div>
+            <div class="inbox-meta"><span class="inbox-time">11d</span><span class="status-pill waiting">No reply</span></div>
+          </div>
+          <div class="inbox-row">
+            <div class="inbox-avatar">O</div>
+            <div class="inbox-main">
+              <div class="inbox-to">To: team@orbitcloud.com</div>
+              <div class="inbox-subject">Bumping this, still stuck on the same issue</div>
+            </div>
+            <div class="inbox-meta"><span class="inbox-time">13d</span><span class="status-pill waiting">No reply</span></div>
+          </div>
+          <div class="inbox-row">
+            <div class="inbox-avatar">S</div>
+            <div class="inbox-main">
+              <div class="inbox-to">To: support@sundialcloud.com</div>
+              <div class="inbox-subject">Fourth attempt, please close the loop</div>
+            </div>
+            <div class="inbox-meta"><span class="inbox-time">15d</span><span class="status-pill waiting">No reply</span></div>
+          </div>
+          <div class="inbox-row">
+            <div class="inbox-avatar">V</div>
+            <div class="inbox-main">
+              <div class="inbox-to">To: help@vertexhome.com</div>
+              <div class="inbox-subject">Re: order never arrived, still waiting</div>
+            </div>
+            <div class="inbox-meta"><span class="inbox-time">18d</span><span class="status-pill waiting">No reply</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-caption">This is what finding the right person usually looks like. Talon does this part.</div>
+    </div>
+
+    <section id="problem">
+      <div class="section-title">The problem</div>
+      <h2>Nobody wants to do this by hand</h2>
+      <div class="problem-track">
+        <div class="problem-card">
+          <div class="mock">
+            <div class="mock-row"><div class="mock-dot"></div><div class="mock-lines"><div class="mock-line short"></div><div class="mock-line long"></div></div></div>
+            <div class="mock-row"><div class="mock-dot"></div><div class="mock-lines"><div class="mock-line short"></div><div class="mock-line long"></div></div></div>
+            <div class="mock-row"><div class="mock-dot"></div><div class="mock-lines"><div class="mock-line short"></div><div class="mock-line long"></div></div></div>
+          </div>
+          <h3>Digging through your inbox</h3>
+          <p>Scrolling past newsletters and auto-replies looking for the one real reply that matters.</p>
+        </div>
+        <div class="problem-card">
+          <div class="mock">
+            <div class="mock-profiles">
+              <div class="mock-profile"><div class="mock-avatar"></div><div class="mock-line short"></div><div class="mock-line short"></div></div>
+              <div class="mock-profile"><div class="mock-avatar"></div><div class="mock-line short"></div><div class="mock-line short"></div></div>
+              <div class="mock-profile"><div class="mock-avatar"></div><div class="mock-line short"></div><div class="mock-line short"></div></div>
+            </div>
+          </div>
+          <h3>Scrolling through profiles</h3>
+          <p>Trying to figure out who at the company can actually help, one profile at a time.</p>
+        </div>
+        <div class="problem-card">
+          <div class="mock">
+            <div class="mock-field" style="width:60%"></div>
+            <div class="mock-field"></div>
+            <div class="mock-field" style="width:80%"></div>
+            <div class="mock-field btn-like"></div>
+          </div>
+          <h3>Hunting for a contact page</h3>
+          <p>Support, partnerships, sponsorships. Every company hides theirs somewhere different, behind a form that goes nowhere.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="section-title">Process</div>
+      <h2>How it works</h2>
+      <p class="how-sub">Tell Talon what you're stuck on, or what you're trying to find: a real
+      person to escalate a conversation to, or every partnership and scholarship contact in a
+      given space. It does the digging, then hands you the channels that actually work.</p>
+      <div class="arch-diagram">
+        <svg viewBox="0 0 1160 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Talon architecture: a message triggers the Talon agent, which uses a Groq chat model, case history memory, the Caspian send tool, and a structured output parser, then sends a reply through Caspian.">
+          <defs>
+            <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="var(--text)"></path>
+            </marker>
+          </defs>
+
+          <!-- main flow connectors -->
+          <line x1="250" y1="115" x2="452" y2="115" stroke="var(--text)" stroke-width="2" marker-end="url(#arrowhead)"></line>
+          <text x="351" y="100" text-anchor="middle" font-size="14" fill="var(--muted)">1 message</text>
+
+          <line x1="700" y1="115" x2="902" y2="115" stroke="var(--text)" stroke-width="2" marker-end="url(#arrowhead)"></line>
+          <text x="801" y="100" text-anchor="middle" font-size="14" fill="var(--muted)">1 reply</text>
+
+          <!-- sub-node connectors -->
+          <path d="M485,175 C485,240 150,255 150,352" fill="none" stroke="var(--muted)" stroke-width="1.75" stroke-dasharray="4 5" stroke-linecap="round"></path>
+          <path d="M540,175 C540,250 430,270 430,352" fill="none" stroke="var(--muted)" stroke-width="1.75" stroke-dasharray="4 5" stroke-linecap="round"></path>
+          <path d="M600,175 C600,250 710,270 710,352" fill="none" stroke="var(--muted)" stroke-width="1.75" stroke-dasharray="4 5" stroke-linecap="round"></path>
+          <path d="M655,175 C655,240 990,255 990,352" fill="none" stroke="var(--muted)" stroke-width="1.75" stroke-dasharray="4 5" stroke-linecap="round"></path>
+
+          <g fill="var(--muted)">
+            <rect x="481" y="171" width="8" height="8" transform="rotate(45 485 175)"></rect>
+            <rect x="536" y="171" width="8" height="8" transform="rotate(45 540 175)"></rect>
+            <rect x="596" y="171" width="8" height="8" transform="rotate(45 600 175)"></rect>
+            <rect x="651" y="171" width="8" height="8" transform="rotate(45 655 175)"></rect>
+            <rect x="146" y="348" width="8" height="8" transform="rotate(45 150 352)"></rect>
+            <rect x="426" y="348" width="8" height="8" transform="rotate(45 430 352)"></rect>
+            <rect x="706" y="348" width="8" height="8" transform="rotate(45 710 352)"></rect>
+            <rect x="986" y="348" width="8" height="8" transform="rotate(45 990 352)"></rect>
+          </g>
+
+          <text x="150" y="200" text-anchor="middle" font-size="12" fill="var(--muted)">Chat Model</text>
+          <text x="990" y="200" text-anchor="middle" font-size="12" fill="var(--muted)">Output Parser</text>
+
+          <!-- node: trigger -->
+          <rect x="20" y="65" width="230" height="100" rx="14" fill="var(--bg)" stroke="var(--border)" stroke-width="1.5"></rect>
+          <foreignObject x="20" y="65" width="230" height="100">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="arch-node">
+              <div class="arch-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.4 8.4 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.4 8.4 0 01-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.4 8.4 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path></svg>
+              </div>
+              <div class="arch-title">Message received</div>
+              <div class="arch-sub">Telegram or email, via Caspian</div>
+            </div>
+          </foreignObject>
+
+          <!-- node: agent -->
+          <rect x="460" y="50" width="240" height="125" rx="16" fill="var(--bg)" stroke="var(--text)" stroke-width="2"></rect>
+          <foreignObject x="460" y="50" width="240" height="125">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="arch-node">
+              <div class="arch-icon"><img src="assets/logo.png" alt="" width="18"></div>
+              <div class="arch-title">Talon</div>
+              <div class="arch-sub">The agent, reasoning on every message</div>
+            </div>
+          </foreignObject>
+
+          <!-- node: output -->
+          <rect x="910" y="65" width="230" height="100" rx="14" fill="var(--bg)" stroke="var(--border)" stroke-width="1.5"></rect>
+          <foreignObject x="910" y="65" width="230" height="100">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="arch-node">
+              <div class="arch-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 2L11 13"></path><path d="M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
+              </div>
+              <div class="arch-title">Reply sent</div>
+              <div class="arch-sub">Back through the same channel</div>
+            </div>
+          </foreignObject>
+
+          <!-- sub-node: chat model -->
+          <circle cx="150" cy="400" r="44" fill="var(--panel)" stroke="var(--border)" stroke-width="1.5"></circle>
+          <foreignObject x="128" y="378" width="44" height="44">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="arch-sub-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"></path></svg>
+            </div>
+          </foreignObject>
+          <foreignObject x="30" y="456" width="240" height="80">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="arch-caption">
+              <div class="arch-name">Groq, gpt-oss-120b</div>
+              <div class="arch-desc">Reads the thread and decides what happens next</div>
+            </div>
+          </foreignObject>
+
+          <!-- sub-node: memory -->
+          <circle cx="430" cy="400" r="44" fill="var(--panel)" stroke="var(--border)" stroke-width="1.5"></circle>
+          <foreignObject x="408" y="378" width="44" height="44">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="arch-sub-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="6" rx="8" ry="3"></ellipse><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"></path><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"></path></svg>
+            </div>
+          </foreignObject>
+          <foreignObject x="310" y="456" width="240" height="80">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="arch-caption">
+              <div class="arch-name">Case history</div>
+              <div class="arch-desc">The full thread for that case, so nothing gets forgotten</div>
+            </div>
+          </foreignObject>
+
+          <!-- sub-node: tool -->
+          <circle cx="710" cy="400" r="44" fill="var(--panel)" stroke="var(--border)" stroke-width="1.5"></circle>
+          <foreignObject x="688" y="378" width="44" height="44">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="arch-sub-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 2L11 13"></path><path d="M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
+            </div>
+          </foreignObject>
+          <foreignObject x="590" y="456" width="240" height="80">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="arch-caption">
+              <div class="arch-name">Caspian send</div>
+              <div class="arch-desc">Actually sends and replies through email or Telegram</div>
+            </div>
+          </foreignObject>
+
+          <!-- sub-node: output parser -->
+          <circle cx="990" cy="400" r="44" fill="var(--panel)" stroke="var(--border)" stroke-width="1.5"></circle>
+          <foreignObject x="968" y="378" width="44" height="44">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="arch-sub-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 4L2 12l6 8"></path><path d="M16 4l6 8-6 8"></path></svg>
+            </div>
+          </foreignObject>
+          <foreignObject x="870" y="456" width="240" height="80">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="arch-caption">
+              <div class="arch-name">Structured decision</div>
+              <div class="arch-desc">Bot or human, resolved or not, and what to say next</div>
+            </div>
+          </foreignObject>
+        </svg>
+      </div>
+    </section>
+
+    <section id="views">
+      <div class="section-title">Product</div>
+      <h2>Two views into the same agent</h2>
+      <div class="views-intro">
+        <div class="grid2">
+          <div>
+            <h3>Talon Chat</h3>
+            <p>Where you talk to your agent and watch it work in real time.</p>
+          </div>
+          <div>
+            <h3>Talon Home</h3>
+            <p>Where you manage cases, channels, and history.</p>
+          </div>
+        </div>
+      </div>
+      <div class="views-panel">
+        <div class="screen">
+          <div class="screen-bar"><span></span><span></span><span></span></div>
+          <div class="screen-body">Screenshot coming soon, work in progress</div>
+        </div>
+        <div class="screen">
+          <div class="screen-bar"><span></span><span></span><span></span></div>
+          <div class="screen-body">Screenshot coming soon, work in progress</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="build">
+      <div class="section-title">Stack</div>
+      <h2>Built with</h2>
+      <div class="stack">
+        <span class="chip">caspian-sdk</span>
+        <span class="chip">Email channel</span>
+        <span class="chip">Telegram channel</span>
+        <span class="chip">Groq inference</span>
+      </div>
+    </section>
+
+    <footer>Built for the Caspian Buildathon, Aug 2026.</footer>
+  </div>
+
+  <script>
+    const cards = document.querySelectorAll('.problem-card');
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.2 });
+    cards.forEach((c) => io.observe(c));
+
+    const loggedInUser = localStorage.getItem('talon_user');
+    if (loggedInUser) {
+      const navActions = document.getElementById('nav-actions');
+      navActions.innerHTML =
+        '<a class="btn" href="home.html">Home</a>' +
+        '<a class="btn primary" href="#" id="logout-btn">Log out</a>';
+      document.getElementById('logout-btn').addEventListener('click', (e) => {
+        e.preventDefault();
+        localStorage.removeItem('talon_user');
+        localStorage.removeItem('talon_onboarded');
+        window.location.reload();
+      });
+      const heroSignup = document.getElementById('hero-signup');
+      if (heroSignup) {
+        heroSignup.textContent = 'Go to Home';
+        heroSignup.href = localStorage.getItem('talon_onboarded') ? 'home.html' : 'onboarding.html';
+      }
+    }
+  </script>
+</body>
+</html>

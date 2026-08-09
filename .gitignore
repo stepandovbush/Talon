@@ -1,0 +1,8 @@
+*.pyc
+.env
+.venv/
+__pycache__/
+cases.json
+node_modules/
+reports.json
+users.db

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talon Connect</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f4f4f3;
+    --panel-2: #ececea;
+    --border: #e4e4e1;
+    --text: #111110;
+    --muted: #6b6b68;
+    --accent: #111110;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .rail {
+    width: 72px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0;
+    gap: 14px;
+  }
+  .rail-logo { display: block; margin-bottom: 22px; }
+  .rail-logo img { height: 20px; width: auto; display: block; }
+  .rail-btn {
+    position: relative;
+    width: 46px; height: 46px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .rail-btn.active { background: var(--panel); color: var(--text); }
+  .rail-btn:hover { background: var(--panel); color: var(--text); }
+  .rail-spacer { flex: 1; }
+
+  .rail-btn::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 56px;
+    top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    background: var(--text);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: 7px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 20;
+  }
+  .rail-btn:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+  .rail-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+
+  .main { flex: 1; display: flex; flex-direction: column; }
+  .topbar {
+    display: flex; align-items: center;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .back-btn {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    margin-right: 6px;
+  }
+  .back-btn:hover { background: var(--panel); }
+
+  .content {
+    flex: 1;
+    padding: 48px 28px;
+    max-width: 640px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .content h2 { font-size: 22px; margin: 0 0 8px; letter-spacing: -0.02em; }
+  .content .lede { font-size: 14px; color: var(--muted); margin: 0 0 28px; max-width: 480px; }
+
+  .connect-list { display: flex; flex-direction: column; gap: 10px; }
+  .connect-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    background: var(--panel);
+  }
+  .connect-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .connect-main { flex: 1; }
+  .connect-name { font-weight: 600; font-size: 14px; }
+  .connect-status { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .connect-btn {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .connect-btn:hover { background: var(--panel-2); }
+
+  .connect-note {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 18px;
+    min-height: 16px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+  <div class="rail">
+    <a class="rail-logo" href="index.html"><img src="assets/logo.png" alt="Talon logo"></a>
+    <a class="rail-btn" href="home.html" data-tip="Home">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>
+    </a>
+    <a class="rail-btn" href="cases.html" data-tip="Cases">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+    </a>
+    <a class="rail-btn" href="schedule.html" data-tip="Schedule">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    </a>
+    <a class="rail-btn" href="report.html" data-tip="Report">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+    </a>
+    <div class="rail-spacer"></div>
+    <a class="rail-btn active" href="connect.html" data-tip="Connect">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+    </a>
+    <a class="rail-btn" href="#" id="profile-btn" data-tip="Log out">
+      <span class="rail-avatar" id="rail-avatar">T</span>
+    </a>
+    <a class="rail-btn" href="settings.html" data-tip="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+    </a>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="back-btn" onclick="history.back()" aria-label="Back" title="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </button>
+      <h1>Connect</h1>
+    </div>
+
+    <div class="content">
+      <h2>Connect your accounts</h2>
+      <p class="lede">Link where you already talk to people. Talon reads context from these to understand who you're trying to reach, and once access is granted, it can send and follow up through them directly, not just draft for you to send yourself.</p>
+
+      <div class="connect-list">
+        <div class="connect-card">
+          <div class="connect-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+          </div>
+          <div class="connect-main">
+            <div class="connect-name">Gmail</div>
+            <div class="connect-status">Not connected</div>
+          </div>
+          <button class="connect-btn" data-name="Gmail" data-note="Gmail isn't connected yet, this button can't finish the OAuth flow on its own. To wire it up: create a project at console.cloud.google.com, enable the Gmail API, add an OAuth client ID (type: Web application), and set GOOGLE_OAUTH_CLIENT_ID plus the redirect URL in .env. That's a one time setup only you can do, since it needs your own Google account. Talon already sends through the Caspian email channel without this, this step is only for reading your personal Gmail inbox for context.">Connect</button>
+        </div>
+
+        <div class="connect-card">
+          <div class="connect-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+          </div>
+          <div class="connect-main">
+            <div class="connect-name">Outlook / Mail</div>
+            <div class="connect-status">Not connected</div>
+          </div>
+          <button class="connect-btn" data-name="Outlook / Mail" data-note="Connecting Outlook needs a Microsoft OAuth Client ID from your own Azure app registration. Once that's granted, Talon can read your inbox for context and send and follow up on your behalf, not just draft.">Connect</button>
+        </div>
+
+        <div class="connect-card">
+          <div class="connect-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2C6.5 2 2 6.6 2 12.2c0 4.5 2.9 8.3 6.8 9.6.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.4-3.4-1.4-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.4.1-2.8 0 0 .8-.3 2.7 1a9.2 9.2 0 015 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.5.1 2.8.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5 3.9-1.3 6.8-5.1 6.8-9.6C22 6.6 17.5 2 12 2z"/></svg>
+          </div>
+          <div class="connect-main">
+            <div class="connect-name">GitHub</div>
+            <div class="connect-status">Not connected</div>
+          </div>
+          <button class="connect-btn" data-name="GitHub" data-note="Connecting GitHub uses their public API. Once you generate a token for it, Talon can read your public profile and activity for context, useful for finding a developer's self listed contact info.">Connect</button>
+        </div>
+
+        <div class="connect-card">
+          <div class="connect-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="9" r="1.2" fill="currentColor" stroke="none"/><path d="M8.5 12v4"/><path d="M12.5 16v-3a1.8 1.8 0 013.6 0v3"/><path d="M12.5 13v3"/></svg>
+          </div>
+          <div class="connect-main">
+            <div class="connect-name">LinkedIn</div>
+            <div class="connect-status">Not connected</div>
+          </div>
+          <button class="connect-btn" data-name="LinkedIn" data-note="Connecting LinkedIn needs a LinkedIn Developer app with API access, set up under your own account. Once that's in place, Talon can read your network for context and reach out through LinkedIn on your behalf.">Connect</button>
+        </div>
+
+        <div class="connect-card">
+          <div class="connect-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4l16 16"/><path d="M20 4L4 20"/></svg>
+          </div>
+          <div class="connect-main">
+            <div class="connect-name">X</div>
+            <div class="connect-status">Not connected</div>
+          </div>
+          <button class="connect-btn" data-name="X" data-note="Connecting X needs your own X Developer API keys. Once you have them, Talon can read public profiles for context and message people through X directly, since X is a Caspian channel already.">Connect</button>
+        </div>
+      </div>
+
+      <div class="connect-note" id="connect-note"></div>
+    </div>
+  </div>
+
+  <script>
+    const talonUser = localStorage.getItem('talon_user');
+    if (!talonUser) {
+      window.location.href = 'signin.html';
+    } else {
+      document.getElementById('rail-avatar').textContent = talonUser.trim().charAt(0).toUpperCase() || 'T';
+    }
+    document.getElementById('profile-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.removeItem('talon_user');
+      localStorage.removeItem('talon_onboarded');
+      window.location.href = 'index.html';
+    });
+
+    const note = document.getElementById('connect-note');
+    document.querySelectorAll('.connect-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        note.textContent = btn.dataset.note;
+      });
+    });
+  </script>
+</body>
+</html>

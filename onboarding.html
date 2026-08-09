@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talon: Welcome</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f4f4f3;
+    --border: #e4e4e1;
+    --text: #111110;
+    --muted: #6b6b68;
+    --accent: #111110;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 28px;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .back-btn {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .back-btn:hover { background: var(--panel); }
+  .wordmark { display: flex; align-items: center; gap: 7px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+  .wordmark img { height: 15px; width: auto; display: block; }
+  .skip { font-size: 14px; color: var(--muted); text-decoration: none; }
+  .skip:hover { color: var(--text); }
+
+  .stage { flex: 1; display: flex; justify-content: center; padding: 24px; }
+  .stage-inner { width: 100%; max-width: 560px; padding-top: 48px; }
+
+  .slide { display: none; }
+  .slide.active { display: block; }
+
+  .slide h1 { font-size: 38px; margin: 0 0 40px; letter-spacing: -0.02em; line-height: 1.15; }
+
+  .field { margin-bottom: 28px; }
+  .field label {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .field label .tag { font-weight: 400; color: var(--muted); }
+  .info-box {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    font-size: 15px;
+    color: var(--muted);
+    background: var(--panel);
+    line-height: 1.55;
+  }
+
+  .next-row { margin-top: 8px; }
+  .btn-next {
+    font-size: 15px;
+    font-weight: 500;
+    padding: 12px 26px;
+    border-radius: 12px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+  }
+  .btn-back {
+    font-size: 14px;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 12px 4px;
+    margin-right: 12px;
+  }
+  .btn-back.ghost { visibility: hidden; }
+
+  footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 24px 56px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--border); transition: all 0.2s ease; }
+  .dot.active { width: 22px; background: var(--accent); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <button class="back-btn" onclick="history.back()" aria-label="Back" title="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </button>
+      <a class="wordmark" href="index.html" style="text-decoration:none;color:inherit;"><img src="assets/logo.png" alt="Talon logo">Talon</a>
+    </div>
+    <a class="skip" href="home.html" id="skip-link">Skip</a>
+  </header>
+
+  <div class="stage">
+    <div class="stage-inner">
+
+      <!-- Slide 1 -->
+      <div class="slide active" data-slide="0">
+        <h1>Welcome to Talon</h1>
+        <div class="field">
+          <label>What Talon does</label>
+          <div class="info-box">Talon takes over a stuck support conversation, figures out when it's talking to a bot instead of a person, and keeps pushing until a real human responds.</div>
+        </div>
+      </div>
+
+      <!-- Slide 2 -->
+      <div class="slide" data-slide="1">
+        <h1>How it reaches people</h1>
+        <div class="field">
+          <label>Talon Relay</label>
+          <div class="info-box">Talon emails the company directly on your behalf and keeps the entire back-and-forth in one thread. You never have to relay messages yourself.</div>
+        </div>
+      </div>
+
+      <!-- Slide 3 -->
+      <div class="slide" data-slide="2">
+        <h1>How it decides</h1>
+        <div class="field">
+          <label>Talon Core <span class="tag">(powered by Caspian)</span></label>
+          <div class="info-box">Every reply gets read and judged as bot or human, using Caspian's multi-channel agent framework as the backbone that connects Talon to email, Telegram, and everywhere else it needs to reach.</div>
+        </div>
+      </div>
+
+      <!-- Slide 4 -->
+      <div class="slide" data-slide="3">
+        <h1>How you stay in the loop</h1>
+        <div class="field">
+          <label>Talon Signal</label>
+          <div class="info-box">The moment a real person responds, or the issue is actually resolved, Talon pings you. Not before.</div>
+        </div>
+      </div>
+
+      <!-- Add new slides above this line as more features are decided -->
+
+      <div class="next-row">
+        <button class="btn-back" id="back-btn">Back</button>
+        <button class="btn-next" id="next-btn">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <footer id="dots"></footer>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const dotsWrap = document.getElementById('dots');
+    const backBtn = document.getElementById('back-btn');
+    const nextBtn = document.getElementById('next-btn');
+    let current = 0;
+
+    // No account database yet, anyone reaching onboarding directly
+    // still gets a placeholder local user so Home doesn't bounce them.
+    if (!localStorage.getItem('talon_user')) {
+      localStorage.setItem('talon_user', 'guest');
+    }
+
+    slides.forEach((_, i) => {
+      const d = document.createElement('div');
+      d.className = 'dot' + (i === 0 ? ' active' : '');
+      dotsWrap.appendChild(d);
+    });
+    const dots = Array.from(dotsWrap.children);
+
+    function render() {
+      slides.forEach((s, i) => s.classList.toggle('active', i === current));
+      dots.forEach((d, i) => d.classList.toggle('active', i === current));
+      backBtn.classList.toggle('ghost', current === 0);
+      nextBtn.textContent = current === slides.length - 1 ? 'Get started' : 'Next';
+    }
+
+    backBtn.addEventListener('click', () => {
+      if (current > 0) { current -= 1; render(); }
+    });
+
+    nextBtn.addEventListener('click', () => {
+      if (current < slides.length - 1) {
+        current += 1;
+        render();
+      } else {
+        localStorage.setItem('talon_onboarded', '1');
+        window.location.href = 'home.html';
+      }
+    });
+
+    document.getElementById('skip-link').addEventListener('click', () => {
+      localStorage.setItem('talon_onboarded', '1');
+    });
+
+    render();
+  </script>
+</body>
+</html>

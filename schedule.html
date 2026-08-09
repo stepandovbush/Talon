@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talon Schedule</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f4f4f3;
+    --panel-2: #ececea;
+    --border: #e4e4e1;
+    --text: #111110;
+    --muted: #6b6b68;
+    --accent: #111110;
+    --online: #4caf7d;
+    --amber: #b8860b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .rail {
+    width: 72px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0;
+    gap: 14px;
+  }
+  .rail-logo { display: block; margin-bottom: 22px; }
+  .rail-logo img { height: 20px; width: auto; display: block; }
+  .rail-btn {
+    position: relative;
+    width: 46px; height: 46px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .rail-btn.active { background: var(--panel); color: var(--text); }
+  .rail-btn:hover { background: var(--panel); color: var(--text); }
+  .rail-spacer { flex: 1; }
+
+  .rail-btn::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 56px;
+    top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    background: var(--text);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: 7px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 20;
+  }
+  .rail-btn:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+  .rail-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+
+  .main { flex: 1; display: flex; flex-direction: column; }
+  .topbar {
+    display: flex; align-items: center;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .back-btn {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    margin-right: 6px;
+  }
+  .back-btn:hover { background: var(--panel); }
+
+  .content { flex: 1; padding: 28px; max-width: 760px; width: 100%; margin: 0 auto; }
+  .lede { font-size: 13.5px; color: var(--muted); margin: 0 0 22px; max-width: 480px; line-height: 1.5; }
+
+  .empty-state {
+    flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 80px 24px;
+  }
+  .placeholder-icon {
+    width: 64px; height: 64px; border-radius: 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+  .empty-state h2 { font-size: 19px; margin: 0 0 8px; }
+  .empty-state p { font-size: 14px; color: var(--muted); max-width: 340px; margin: 0; }
+
+  .schedule-list { display: flex; flex-direction: column; gap: 12px; }
+  .schedule-card {
+    border: 1px solid var(--border); border-radius: 16px;
+    background: var(--panel); padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .schedule-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .schedule-title { font-size: 14px; font-weight: 600; }
+  .schedule-subject { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+  .schedule-next {
+    font-size: 12.5px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .schedule-next-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--online); animation: pulse 1.4s infinite ease-in-out; }
+  .schedule-next.paused .schedule-next-dot, .schedule-next.capped .schedule-next-dot { background: var(--muted); animation: none; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .schedule-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .schedule-label { font-size: 11.5px; color: var(--muted); }
+  .schedule-select {
+    font-size: 12.5px; font-weight: 500;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text);
+    padding: 5px 8px;
+  }
+  .schedule-pause-btn {
+    font-size: 11.5px; font-weight: 600;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    border-radius: 999px; padding: 5px 12px; cursor: pointer;
+  }
+  .schedule-pause-btn:hover { background: var(--panel-2); }
+  .schedule-pause-btn.is-paused { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .schedule-meta { font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="rail">
+    <a class="rail-logo" href="index.html"><img src="assets/logo.png" alt="Talon logo"></a>
+    <a class="rail-btn" href="home.html" data-tip="Home">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>
+    </a>
+    <a class="rail-btn" href="cases.html" data-tip="Cases">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+    </a>
+    <a class="rail-btn active" href="schedule.html" data-tip="Schedule">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    </a>
+    <a class="rail-btn" href="report.html" data-tip="Report">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+    </a>
+    <div class="rail-spacer"></div>
+    <a class="rail-btn" href="connect.html" data-tip="Connect">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+    </a>
+    <a class="rail-btn" href="#" id="profile-btn" data-tip="Log out">
+      <span class="rail-avatar" id="rail-avatar">T</span>
+    </a>
+    <a class="rail-btn" href="settings.html" data-tip="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+    </a>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="back-btn" onclick="history.back()" aria-label="Back" title="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </button>
+      <h1>Schedule</h1>
+    </div>
+    <div class="content">
+      <p class="lede">Talon keeps working after the first email. If a case goes quiet, it automatically sends a follow-up on the interval below, up to 3 times, then stops and waits for you. Adjust or pause any case here.</p>
+      <div class="schedule-list" id="schedule-list"></div>
+      <div class="empty-state" id="empty-state">
+        <div class="placeholder-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        </div>
+        <h2>Nothing scheduled yet</h2>
+        <p>Once Talon sends an email on your behalf from Home, it shows up here with its next automatic follow-up time.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Only a local static preview (e.g. Live Server on :5500) needs to be
+    // pointed at the backend explicitly. Everywhere else -- served by
+    // server.py directly on any host/port, including a real deployment --
+    // the API is same-origin, so a relative path is correct.
+    const isLocalStaticPreview = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      && location.port && location.port !== '8744';
+    const TALON_API = isLocalStaticPreview ? 'http://localhost:8744' : '';
+    const MAX_AUTO_FOLLOW_UPS = 3;
+
+    const talonUser = localStorage.getItem('talon_user');
+    if (!talonUser) {
+      window.location.href = 'signin.html';
+    } else {
+      document.getElementById('rail-avatar').textContent = talonUser.trim().charAt(0).toUpperCase() || 'T';
+    }
+    document.getElementById('profile-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.removeItem('talon_user');
+      localStorage.removeItem('talon_onboarded');
+      window.location.href = 'index.html';
+    });
+
+    function formatCountdown(seconds) {
+      if (seconds <= 0) return 'due now';
+      const hours = Math.round(seconds / 3600);
+      if (hours < 1) return `in ${Math.round(seconds / 60)}m`;
+      if (hours < 48) return `in ${hours}h`;
+      return `in ${Math.round(hours / 24)}d`;
+    }
+
+    async function postSchedule(caseId, body) {
+      await fetch(`${TALON_API}/api/cases/${encodeURIComponent(caseId)}/schedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      loadCases();
+    }
+
+    function renderScheduleCard(c, now) {
+      const card = document.createElement('div');
+      card.className = 'schedule-card';
+
+      const top = document.createElement('div');
+      top.className = 'schedule-top';
+      const titleWrap = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'schedule-title';
+      title.textContent = c.recipient || 'Unknown recipient';
+      titleWrap.appendChild(title);
+      if (c.subject) {
+        const subj = document.createElement('div');
+        subj.className = 'schedule-subject';
+        subj.textContent = c.subject;
+        titleWrap.appendChild(subj);
+      }
+      top.appendChild(titleWrap);
+
+      const next = document.createElement('div');
+      let nextLabel, nextCls;
+      if (c.status !== 'awaiting_reply') {
+        nextLabel = 'Resolved'; nextCls = 'capped';
+      } else if (c.paused) {
+        nextLabel = 'Paused'; nextCls = 'paused';
+      } else if ((c.follow_ups_sent || 0) >= MAX_AUTO_FOLLOW_UPS) {
+        nextLabel = 'Follow-up limit reached'; nextCls = 'capped';
+      } else if (c.next_follow_up_at) {
+        nextLabel = `Next follow-up ${formatCountdown(c.next_follow_up_at - now)}`; nextCls = '';
+      } else {
+        nextLabel = 'Not scheduled'; nextCls = 'capped';
+      }
+      next.className = `schedule-next ${nextCls}`;
+      next.innerHTML = `<span class="schedule-next-dot"></span><span>${nextLabel}</span>`;
+      top.appendChild(next);
+      card.appendChild(top);
+
+      if (c.status === 'awaiting_reply') {
+        const row = document.createElement('div');
+        row.className = 'schedule-row';
+
+        const label = document.createElement('span');
+        label.className = 'schedule-label';
+        label.textContent = 'Follow up every';
+        row.appendChild(label);
+
+        const select = document.createElement('select');
+        select.className = 'schedule-select';
+        [
+          [24, '24 hours'], [48, '48 hours'], [72, '3 days'], [168, '1 week'],
+        ].forEach(([hours, label]) => {
+          const opt = document.createElement('option');
+          opt.value = hours;
+          opt.textContent = label;
+          if (Number(c.follow_up_hours) === hours) opt.selected = true;
+          select.appendChild(opt);
+        });
+        select.addEventListener('change', () => {
+          postSchedule(c.id, { follow_up_hours: Number(select.value) });
+        });
+        row.appendChild(select);
+
+        const pauseBtn = document.createElement('button');
+        pauseBtn.type = 'button';
+        pauseBtn.className = 'schedule-pause-btn' + (c.paused ? ' is-paused' : '');
+        pauseBtn.textContent = c.paused ? 'Resume follow-ups' : 'Pause follow-ups';
+        pauseBtn.addEventListener('click', () => {
+          postSchedule(c.id, { paused: !c.paused });
+        });
+        row.appendChild(pauseBtn);
+
+        card.appendChild(row);
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'schedule-meta';
+      meta.textContent = `${c.follow_ups_sent || 0} of ${MAX_AUTO_FOLLOW_UPS} auto follow-ups sent`;
+      card.appendChild(meta);
+
+      return card;
+    }
+
+    function renderCases(cases, now) {
+      const list = document.getElementById('schedule-list');
+      const empty = document.getElementById('empty-state');
+      if (!cases.length) {
+        list.style.display = 'none';
+        empty.style.display = 'flex';
+        return;
+      }
+      empty.style.display = 'none';
+      list.style.display = 'flex';
+      list.innerHTML = '';
+      cases.forEach((c) => list.appendChild(renderScheduleCard(c, now)));
+    }
+
+    async function loadCases() {
+      try {
+        const res = await fetch(`${TALON_API}/api/cases`);
+        const data = await res.json();
+        renderCases(data.cases || [], data.now || Date.now() / 1000);
+      } catch (err) {
+        // Backend unreachable, leave whatever was last rendered.
+      }
+    }
+
+    loadCases();
+    setInterval(loadCases, 8000);
+  </script>
+</body>
+</html>

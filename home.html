@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talon Home</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f4f4f3;
+    --panel-2: #ececea;
+    --border: #e4e4e1;
+    --text: #111110;
+    --muted: #6b6b68;
+    --accent: #111110;
+    --online: #4caf7d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* Icon rail */
+  .rail {
+    width: 72px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0;
+    gap: 14px;
+  }
+  .rail-logo { display: block; margin-bottom: 22px; }
+  .rail-logo img { height: 20px; width: auto; display: block; }
+  .rail-btn {
+    position: relative;
+    width: 46px; height: 46px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .rail-btn.active { background: var(--panel); color: var(--text); }
+  .rail-btn:hover { background: var(--panel); color: var(--text); }
+  .rail-spacer { flex: 1; }
+
+  .rail-btn::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 56px;
+    top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    background: var(--text);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: 7px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 20;
+  }
+  .rail-btn:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+  .rail-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+
+  /* Main */
+  .main { flex: 1; display: flex; flex-direction: column; }
+  .topbar {
+    display: flex; align-items: center;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .back-btn {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    margin-right: 6px;
+  }
+  .back-btn:hover { background: var(--panel); }
+
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 24px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-decor {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  .decor-blob { position: absolute; border-radius: 40px; filter: blur(60px); }
+  .decor-1 {
+    width: 420px; height: 420px; top: -140px; right: -120px;
+    background: linear-gradient(135deg, #ffd6a5, #ff9a9e 30%, #a29bfe 65%, #6ee7b7);
+    opacity: 0.45; transform: rotate(18deg);
+  }
+  .decor-2 {
+    width: 360px; height: 360px; bottom: -160px; left: -110px;
+    background: linear-gradient(135deg, #a1c4fd, #c2e9fb 40%, #fbc2eb 70%, #fdcbf1);
+    opacity: 0.4; transform: rotate(-12deg);
+  }
+  .decor-3 {
+    width: 240px; height: 240px; top: 18%; left: 6%;
+    background: linear-gradient(135deg, #fddb92, #6ee7b7);
+    opacity: 0.28; transform: rotate(8deg);
+  }
+  .chat-mode .hero-decor { opacity: 0; }
+
+  /* Hero ask */
+  .hero-ask {
+    width: 100%; max-width: 640px;
+    height: calc(100vh - 130px);
+    min-height: 420px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative; z-index: 1;
+  }
+
+  .hero-badge {
+    position: relative;
+    width: 60px; height: 60px;
+    margin: 0 auto 18px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease;
+    max-height: 60px; overflow: visible;
+  }
+  .hero-badge-glow {
+    position: absolute; inset: -16px;
+    background: radial-gradient(circle, rgba(110,231,183,0.55), transparent 70%);
+    filter: blur(4px);
+    border-radius: 50%;
+  }
+  .hero-badge-icon {
+    position: relative;
+    width: 50px; height: 50px; border-radius: 15px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero-badge-icon img { width: 21px; height: auto; display: block; }
+  .chat-mode .hero-badge { opacity: 0; max-height: 0; margin: 0; }
+
+  .hero-heading {
+    font-size: 32px; font-weight: 700; letter-spacing: -0.02em;
+    text-align: center; margin: 0 0 26px;
+    max-height: 80px; overflow: hidden;
+    transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease;
+    flex-shrink: 0;
+  }
+  .chat-mode .hero-heading { opacity: 0; max-height: 0; margin: 0; }
+
+  .agent-chat {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-grow: 0;
+    min-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    padding: 4px 2px;
+    transition: flex-grow 0.45s ease, opacity 0.35s ease, margin 0.35s ease;
+  }
+  .chat-mode .agent-chat { flex-grow: 1; opacity: 1; margin-bottom: 20px; overflow-y: auto; }
+  .chat-msg { display: flex; gap: 9px; align-items: flex-end; }
+  .chat-msg.user { flex-direction: row-reverse; }
+  .chat-avatar-mini {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--panel); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .chat-avatar-mini img { width: 13px; height: auto; display: block; }
+  .chat-bubble {
+    max-width: 78%;
+    text-align: left;
+    padding: 10px 14px;
+    border-radius: 14px;
+    border-bottom-left-radius: 4px;
+    font-size: 14px;
+    line-height: 1.45;
+    background: var(--panel);
+    color: var(--text);
+  }
+  .chat-msg.user .chat-bubble {
+    background: var(--accent);
+    color: #fff;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-bubble.typing { display: flex; align-items: center; gap: 4px; padding: 13px 16px; }
+  .typing-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--muted);
+    animation: typingBlink 1.2s infinite ease-in-out;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typingBlink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+
+  .suggested-wrap {
+    width: 100%;
+    max-height: 130px;
+    overflow: hidden;
+    flex-shrink: 0;
+    transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease;
+  }
+  .chat-mode .suggested-wrap { opacity: 0; max-height: 0; margin: 0; pointer-events: none; }
+  .suggested-label { font-size: 12px; color: var(--muted); text-align: center; margin: 20px 0 10px; }
+
+  @keyframes askPulse { 0% { transform: scale(1); } 45% { transform: scale(1.015); } 100% { transform: scale(1); } }
+  .ask-box {
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 18px 20px 14px;
+    text-align: left;
+    background: var(--bg);
+    width: 100%;
+    flex-shrink: 0;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+  }
+  .ask-box.pulse { animation: askPulse 0.5s ease; }
+  .ask-box input {
+    width: 100%;
+    border: none;
+    outline: none;
+    font-size: 16px;
+    color: var(--text);
+    background: transparent;
+    margin-bottom: 14px;
+  }
+  .ask-box-row { display: flex; align-items: center; gap: 10px; }
+  .ask-plus {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--bg);
+    color: var(--muted); font-size: 17px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .ask-channel-pill {
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 12px 6px 8px;
+    font-size: 13px;
+    color: var(--muted);
+    background: var(--bg);
+    cursor: pointer;
+  }
+  .ask-row-spacer { flex: 1; }
+  .ask-channel-icons { display: flex; gap: 6px; }
+  .ask-channel-icon {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--panel); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted);
+  }
+  .ask-send {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .quick-actions {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 10px; margin-top: 20px;
+  }
+  .quick-pill {
+    display: flex; align-items: center; gap: 7px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 9px 16px;
+    font-size: 13.5px;
+    color: var(--text);
+    background: var(--bg);
+    cursor: pointer;
+  }
+  .quick-pill:hover { background: var(--panel); }
+
+  /* Split workspace: chat on the left, live agent activity on the right */
+  .workspace {
+    display: flex;
+    width: 100%;
+    max-width: 640px;
+    height: calc(100vh - 130px);
+    min-height: 420px;
+    gap: 18px;
+    align-items: stretch;
+    position: relative;
+    z-index: 1;
+    transition: max-width 0.4s ease;
+  }
+  .workspace.panel-open { max-width: 1000px; }
+  .workspace .hero-ask { flex: 1 1 640px; min-width: 0; max-width: 640px; margin: 0 auto; height: auto; }
+
+  .agent-panel {
+    flex: 0 0 0px;
+    width: 0;
+    opacity: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--bg);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.07);
+    display: flex;
+    flex-direction: column;
+    transition: flex-basis 0.35s ease, width 0.35s ease, opacity 0.3s ease;
+    align-self: stretch;
+    margin: auto 0;
+    max-height: 78%;
+  }
+  .workspace.panel-open .agent-panel { flex: 0 0 320px; width: 320px; opacity: 1; }
+
+  .agent-panel-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 15px 18px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    border-radius: 18px 18px 0 0;
+    flex-shrink: 0;
+  }
+  .agent-panel-header img { width: 15px; height: auto; display: block; flex-shrink: 0; }
+  .agent-panel-header-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .agent-panel-title-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; }
+  .agent-panel-sub { font-size: 10.5px; color: var(--muted); }
+  .agent-panel-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--online);
+    flex-shrink: 0;
+    animation: agentPulse 1.4s infinite ease-in-out;
+  }
+  .agent-panel-dot.idle { background: var(--muted); animation: none; }
+  @keyframes agentPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .agent-panel-steps {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px 18px 16px;
+  }
+  .agent-step {
+    position: relative;
+    display: flex; align-items: flex-start; gap: 10px;
+    padding-left: 20px;
+    padding-bottom: 14px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--muted);
+    animation: stepFadeIn 0.25s ease;
+  }
+  .agent-step:last-child { padding-bottom: 0; }
+  .agent-step::before {
+    /* connecting timeline line down to the next step */
+    content: '';
+    position: absolute;
+    left: 5px; top: 15px; bottom: 0;
+    width: 1px;
+    background: var(--border);
+  }
+  .agent-step:last-child::before { display: none; }
+  .agent-step.done { color: var(--text); }
+  .agent-step-dot {
+    position: absolute;
+    left: 0; top: 3px;
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    box-sizing: border-box;
+  }
+  .agent-step.done .agent-step-dot { border-color: var(--online); background: var(--online); }
+  .agent-step.done .agent-step-dot::after {
+    content: '';
+    width: 3px; height: 5px;
+    border: solid #fff;
+    border-width: 0 1.4px 1.4px 0;
+    transform: rotate(45deg) translate(-0.5px, -0.5px);
+  }
+  .agent-step.active .agent-step-dot {
+    border-color: var(--text);
+    animation: agentRing 1s infinite ease-in-out;
+  }
+  @keyframes agentRing {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(17,17,16,0.14); }
+    50% { box-shadow: 0 0 0 4px rgba(17,17,16,0.14); }
+  }
+  @keyframes stepFadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+  .agent-step-text { word-break: break-word; }
+  .agent-step-text code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    background: var(--panel-2);
+    padding: 1px 4px;
+    border-radius: 4px;
+  }
+
+  /* Structured contact result card */
+  .contact-card {
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .contact-card-title { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .contact-card-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .contact-card-report-link {
+    font-size: 11.5px; font-weight: 600; color: var(--text);
+    text-decoration: none; white-space: nowrap; flex-shrink: 0;
+  }
+  .contact-card-report-link:hover { text-decoration: underline; }
+  .contact-section { display: flex; flex-direction: column; gap: 10px; }
+  .contact-section-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted);
+  }
+  .contact-section.unverified .contact-section-label { color: #b8860b; }
+  .contact-row {
+    display: flex; align-items: center; gap: 11px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 9px 12px;
+  }
+  .contact-section.unverified .contact-row { border-style: dashed; }
+  .contact-icon {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .contact-icon svg { width: 15px; height: 15px; display: block; }
+  .contact-row-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .contact-row-label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .contact-row-value {
+    font-size: 13.5px; color: var(--text); text-decoration: none;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .contact-row-value:hover { text-decoration: underline; }
+  .contact-unverified-hint { font-size: 11.5px; color: var(--muted); }
+  .contact-empty { font-size: 13.5px; color: var(--muted); }
+
+  .profile-section { gap: 12px; }
+  .profile-about { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text); }
+  .founder-chip {
+    display: flex; align-items: flex-start; gap: 11px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 12px;
+  }
+  .founder-avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+  }
+  .founder-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .founder-name-line { font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .founder-role {
+    font-size: 10.5px; font-weight: 500; color: var(--muted);
+    background: var(--panel-2); border-radius: 999px; padding: 2px 8px;
+  }
+  .founder-note { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .profile-facts { display: flex; flex-direction: column; gap: 6px; }
+  .profile-fact { font-size: 12.5px; line-height: 1.5; color: var(--text); }
+  .profile-fact-label {
+    font-weight: 600; color: var(--muted); margin-right: 6px;
+  }
+
+  /* Outreach-sent card */
+  .outreach-card { display: flex; flex-direction: column; gap: 12px; max-width: 100%; }
+  .outreach-card-header { display: flex; align-items: center; gap: 12px; }
+  .outreach-icon {
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .outreach-icon svg { width: 16px; height: 16px; }
+  .outreach-card-title { font-size: 14px; font-weight: 600; }
+  .outreach-card-sub { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+  .outreach-preview {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .outreach-preview-subject { font-size: 13px; font-weight: 600; }
+  .outreach-preview-text {
+    font-size: 12.5px; line-height: 1.5; color: var(--muted);
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .outreach-case-tag {
+    align-self: flex-start;
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 999px; padding: 4px 10px;
+  }
+
+  /* Gap-calling, per-row quick action, similar companies, follow-up */
+  .contact-gap-note {
+    font-size: 12.5px; line-height: 1.5; color: #7a4a12;
+    background: #fdf1e7; border: 1px solid #f0d9b8;
+    border-radius: 10px; padding: 9px 12px;
+  }
+  .contact-row-action {
+    flex-shrink: 0;
+    font-size: 11.5px; font-weight: 600;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    border-radius: 999px; padding: 5px 11px;
+    cursor: pointer;
+  }
+  .contact-row-action:hover { background: var(--panel-2); }
+  .similar-section { gap: 10px; }
+  .similar-company {
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+    background: var(--bg);
+  }
+  .similar-company-title { font-size: 12.5px; font-weight: 600; }
+  .mini-contact-list { display: flex; flex-direction: column; gap: 8px; }
+  .mini-contact-list .contact-row { border-style: dashed; padding: 7px 10px; }
+  .mini-contact-list .contact-icon { width: 24px; height: 24px; }
+  .mini-contact-list .contact-icon svg { width: 12px; height: 12px; }
+  .contact-follow-up {
+    font-size: 12.5px; line-height: 1.5; color: var(--muted);
+    border-top: 1px solid var(--border); padding-top: 12px;
+  }
+
+  .backend-banner {
+    display: none;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 12px 28px;
+    background: #fdf1e7;
+    color: #7a4a12;
+    border-bottom: 1px solid #f0d9b8;
+  }
+  .backend-banner.show { display: block; }
+  .backend-banner code {
+    background: rgba(0,0,0,0.06);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .content { overflow-y: auto; }
+    .workspace { flex-wrap: wrap; height: auto; max-width: 640px; }
+    .workspace.panel-open { max-width: 640px; }
+    .workspace .hero-ask { flex-basis: 100%; height: auto; }
+    .agent-panel { max-height: 0; }
+    .workspace.panel-open .agent-panel {
+      flex-basis: 100%; width: 100%; max-height: 200px; margin-top: 14px;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="rail">
+    <a class="rail-logo" href="index.html"><img src="assets/logo.png" alt="Talon logo"></a>
+    <a class="rail-btn active" href="home.html" data-tip="Home">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>
+    </a>
+    <a class="rail-btn" href="cases.html" data-tip="Cases">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+    </a>
+    <a class="rail-btn" href="schedule.html" data-tip="Schedule">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    </a>
+    <a class="rail-btn" href="report.html" data-tip="Report">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+    </a>
+    <div class="rail-spacer"></div>
+    <a class="rail-btn" href="connect.html" data-tip="Connect">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+    </a>
+    <a class="rail-btn" href="#" id="profile-btn" data-tip="Log out">
+      <span class="rail-avatar" id="rail-avatar">T</span>
+    </a>
+    <a class="rail-btn" href="settings.html" data-tip="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+    </a>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="back-btn" onclick="history.back()" aria-label="Back" title="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </button>
+      <h1>Home</h1>
+    </div>
+
+    <div class="backend-banner" id="backend-banner"></div>
+
+    <div class="content" id="content-wrap">
+      <div class="hero-decor" aria-hidden="true">
+        <div class="decor-blob decor-1"></div>
+        <div class="decor-blob decor-2"></div>
+        <div class="decor-blob decor-3"></div>
+      </div>
+
+      <div class="workspace" id="workspace">
+        <div class="hero-ask" id="hero-ask">
+          <div class="hero-badge">
+            <span class="hero-badge-glow"></span>
+            <span class="hero-badge-icon"><img src="assets/logo.png" alt=""></span>
+          </div>
+
+          <h2 class="hero-heading" id="hero-heading">What do you need Talon to do?</h2>
+
+          <div class="agent-chat" id="agent-chat"></div>
+
+          <div class="ask-box" id="ask-box">
+            <input type="text" id="composer-input" placeholder="Tell Talon what you're stuck on...">
+            <div class="ask-box-row">
+              <button class="ask-plus" id="ask-attach" title="Attach">+</button>
+              <button class="ask-channel-pill" id="ask-channel-pill">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6"/><path d="M12 16v6"/><circle cx="12" cy="12" r="4"/></svg>
+                Channel
+              </button>
+              <div class="ask-row-spacer"></div>
+              <div class="ask-channel-icons">
+                <span class="ask-channel-icon" title="Email">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+                </span>
+                <span class="ask-channel-icon" title="Telegram">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                </span>
+              </div>
+              <button class="ask-send" id="composer-send" title="Send">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="suggested-wrap">
+            <div class="suggested-label">Suggested</div>
+            <div class="quick-actions">
+              <button class="quick-pill" data-note="Talon will chase this reply once a channel is connected.">Chase a reply</button>
+              <button class="quick-pill" data-note="Case tracking connects once the backend agent is live.">Check a case</button>
+              <button class="quick-pill" data-note="Head to Connect to link an account.">Connect an account</button>
+              <button class="quick-pill" data-note="Talon loops you in the moment a real human responds.">Reach a human</button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="agent-panel" id="agent-panel">
+          <div class="agent-panel-header">
+            <img src="assets/logo.png" alt="">
+            <div class="agent-panel-header-text">
+              <div class="agent-panel-title-row">
+                <span class="agent-panel-dot" id="agent-panel-dot"></span>
+                <span id="agent-panel-title">Talon is working</span>
+              </div>
+              <span class="agent-panel-sub" id="agent-panel-sub">Live activity</span>
+            </div>
+          </div>
+          <div class="agent-panel-steps" id="agent-panel-steps"></div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Talon's backend (server.py) always runs on :8744. This page itself may be
+    // served from there directly, or previewed from a separate static server
+    // (e.g. Live Server on :5500) — either way, API calls always target :8744.
+    // Only a local static preview (e.g. Live Server on :5500) needs to be
+    // pointed at the backend explicitly. Everywhere else -- served by
+    // server.py directly on any host/port, including a real deployment --
+    // the API is same-origin, so a relative path is correct.
+    const isLocalStaticPreview = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      && location.port && location.port !== '8744';
+    const TALON_API = isLocalStaticPreview ? 'http://localhost:8744' : '';
+
+    // --- Chat transcript (defined first so it's ready before we use it below) ---
+    const chat = document.getElementById('agent-chat');
+
+    function addBubble(role, text) {
+      const msg = document.createElement('div');
+      msg.className = 'chat-msg ' + role;
+      if (role === 'agent') {
+        const av = document.createElement('span');
+        av.className = 'chat-avatar-mini';
+        av.innerHTML = '<img src="assets/logo.png" alt="">';
+        msg.appendChild(av);
+      }
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-bubble';
+      bubble.textContent = text;
+      msg.appendChild(bubble);
+      chat.appendChild(msg);
+      chat.scrollTop = chat.scrollHeight;
+      return bubble;
+    }
+
+    function agentReply(text, delay = 850) {
+      const msg = document.createElement('div');
+      msg.className = 'chat-msg agent';
+      const av = document.createElement('span');
+      av.className = 'chat-avatar-mini';
+      av.innerHTML = '<img src="assets/logo.png" alt="">';
+      msg.appendChild(av);
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-bubble typing';
+      bubble.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+      msg.appendChild(bubble);
+      chat.appendChild(msg);
+      chat.scrollTop = chat.scrollHeight;
+      setTimeout(() => {
+        bubble.classList.remove('typing');
+        bubble.textContent = text;
+        chat.scrollTop = chat.scrollHeight;
+      }, delay);
+    }
+
+    // --- Landing -> chat transition ---
+    let chatStarted = false;
+    let displayName = 'there';
+    const contentWrap = document.getElementById('content-wrap');
+    const askBox = document.getElementById('ask-box');
+
+    function enterChatMode() {
+      if (chatStarted) return;
+      chatStarted = true;
+      contentWrap.classList.add('chat-mode');
+      askBox.classList.add('pulse');
+      setTimeout(() => askBox.classList.remove('pulse'), 500);
+    }
+
+    function sendToTalon(text, replyText) {
+      if (!text.trim()) return;
+      const isFirst = !chatStarted;
+      enterChatMode();
+      addBubble('user', text.trim());
+      agentReply(isFirst ? `Hi ${displayName}. ${replyText}` : replyText);
+    }
+
+    // --- Live agent activity panel (right side) ---
+    const workspace = document.getElementById('workspace');
+    const agentPanelSteps = document.getElementById('agent-panel-steps');
+    const agentPanelDot = document.getElementById('agent-panel-dot');
+    const agentPanelTitle = document.getElementById('agent-panel-title');
+    const agentPanelSub = document.getElementById('agent-panel-sub');
+    let closePanelTimer = null;
+
+    function openAgentPanel() {
+      if (closePanelTimer) { clearTimeout(closePanelTimer); closePanelTimer = null; }
+      agentPanelSteps.innerHTML = '';
+      agentPanelDot.classList.remove('idle');
+      agentPanelTitle.textContent = 'Talon is working';
+      agentPanelSub.textContent = 'Live activity';
+      workspace.classList.add('panel-open');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Renders a step line as text, styling any bare URL inside it as inline
+    // code so file paths and links read cleanly against the plain steps.
+    function formatStepText(text) {
+      return escapeHtml(text).replace(/(https?:\/\/[^\s]+)/g, '<code>$1</code>');
+    }
+
+    function renderAgentSteps(steps, done) {
+      agentPanelSteps.innerHTML = '';
+      steps.forEach((text, i) => {
+        const row = document.createElement('div');
+        const isLast = i === steps.length - 1;
+        row.className = 'agent-step ' + (isLast && !done ? 'active' : 'done');
+        const dot = document.createElement('span');
+        dot.className = 'agent-step-dot';
+        row.appendChild(dot);
+        const label = document.createElement('span');
+        label.className = 'agent-step-text';
+        label.innerHTML = formatStepText(text);
+        row.appendChild(label);
+        agentPanelSteps.appendChild(row);
+      });
+      agentPanelSteps.scrollTop = agentPanelSteps.scrollHeight;
+      agentPanelSub.textContent = done ? `${steps.length} step${steps.length === 1 ? '' : 's'} complete` : `Step ${steps.length}...`;
+      if (done) {
+        agentPanelDot.classList.add('idle');
+        agentPanelTitle.textContent = 'Done';
+        closePanelTimer = setTimeout(() => workspace.classList.remove('panel-open'), 2200);
+      }
+    }
+
+    // --- Structured contact card (emails + socials, with platform icons) ---
+    const EMAIL_CATEGORY_META = {
+      partnership: 'Partnership',
+      general: 'General / Support',
+      press: 'Press',
+      careers: 'Careers',
+      other: 'Other',
+    };
+    const EMAIL_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>';
+    const SOCIAL_META = {
+      linkedin: { label: 'LinkedIn', color: '#0a66c2', svg: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M6.94 8.5H3.56V20h3.38V8.5zM5.25 3.6a1.96 1.96 0 100 3.92 1.96 1.96 0 000-3.92zM20.44 20h-3.37v-5.6c0-1.34-.02-3.05-1.86-3.05-1.87 0-2.16 1.46-2.16 2.96V20H9.68V8.5h3.24v1.57h.05c.45-.86 1.56-1.76 3.21-1.76 3.44 0 4.26 2.26 4.26 5.2V20z"/></svg>' },
+      twitter: { label: 'X / Twitter', color: '#111110', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M4 4l16 16"/><path d="M20 4L4 20"/></svg>' },
+      instagram: { label: 'Instagram', color: '#d6249f', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="0.9" fill="#fff" stroke="none"/></svg>' },
+      facebook: { label: 'Facebook', color: '#1877f2', svg: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M14 9h2.5V6H14c-2 0-3.5 1.6-3.5 3.6V11H8v3h2.5v6H13v-6h2.3l.4-3H13V9.8c0-.5.3-.8.7-.8z"/></svg>' },
+      tiktok: { label: 'TikTok', color: '#111110', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M9 4v11.2a3.3 3.3 0 11-2-3.03"/><path d="M9 4c.4 2.3 2.3 4.2 4.6 4.5"/></svg>' },
+      youtube: { label: 'YouTube', color: '#ff0000', svg: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M9 8.3l7 3.7-7 3.7z"/></svg>' },
+    };
+
+    function socialHandle(name, url) {
+      try {
+        const u = new URL(url);
+        const parts = u.pathname.split('/').filter(Boolean);
+        if (name === 'linkedin' || name === 'youtube') return parts.join('/') || u.hostname;
+        // The page/profile name is always the first path segment (facebook.com/formaloo/about
+        // is the "about" tab of the "formaloo" page, not a page called "about").
+        const handle = parts[0] || u.hostname;
+        return handle.startsWith('@') ? handle : '@' + handle;
+      } catch (e) {
+        return url;
+      }
+    }
+
+    function contactRow(iconSvg, iconColor, label, valueText, href, emailForCompose) {
+      const row = document.createElement('div');
+      row.className = 'contact-row';
+      const icon = document.createElement('span');
+      icon.className = 'contact-icon';
+      icon.style.background = iconColor;
+      icon.innerHTML = iconSvg;
+      row.appendChild(icon);
+      const textWrap = document.createElement('div');
+      textWrap.className = 'contact-row-text';
+      const labelEl = document.createElement('span');
+      labelEl.className = 'contact-row-label';
+      labelEl.textContent = label;
+      textWrap.appendChild(labelEl);
+      const valueEl = document.createElement('a');
+      valueEl.className = 'contact-row-value';
+      valueEl.textContent = valueText;
+      valueEl.href = href;
+      if (!href.startsWith('mailto:')) { valueEl.target = '_blank'; valueEl.rel = 'noopener'; }
+      textWrap.appendChild(valueEl);
+      row.appendChild(textWrap);
+
+      // Only emails can actually be messaged (that's the only channel Talon
+      // sends through today) -- prefill the composer, don't fake a social DM.
+      if (emailForCompose) {
+        const msgBtn = document.createElement('button');
+        msgBtn.type = 'button';
+        msgBtn.className = 'contact-row-action';
+        msgBtn.textContent = 'Message';
+        msgBtn.title = `Draft a message to ${emailForCompose}`;
+        msgBtn.addEventListener('click', () => {
+          const input = document.getElementById('composer-input');
+          input.value = `Email ${emailForCompose} about `;
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+        });
+        row.appendChild(msgBtn);
+      }
+      return row;
+    }
+
+    function initials(name) {
+      return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+    }
+
+    function renderProfileSection(profile) {
+      const section = document.createElement('div');
+      section.className = 'contact-section profile-section';
+
+      if (profile.about) {
+        const about = document.createElement('p');
+        about.className = 'profile-about';
+        about.textContent = profile.about;
+        section.appendChild(about);
+      }
+
+      if (profile.founders && profile.founders.length) {
+        const label = document.createElement('div');
+        label.className = 'contact-section-label';
+        label.textContent = profile.founders.length > 1 ? 'Founders' : 'Founder';
+        section.appendChild(label);
+        profile.founders.forEach((f) => {
+          const chip = document.createElement('div');
+          chip.className = 'founder-chip';
+          const avatar = document.createElement('span');
+          avatar.className = 'founder-avatar';
+          avatar.textContent = initials(f.name || '?');
+          chip.appendChild(avatar);
+          const textWrap = document.createElement('div');
+          textWrap.className = 'founder-text';
+          const nameLine = document.createElement('div');
+          nameLine.className = 'founder-name-line';
+          nameLine.textContent = f.name || 'Unknown';
+          if (f.role) {
+            const roleTag = document.createElement('span');
+            roleTag.className = 'founder-role';
+            roleTag.textContent = f.role;
+            nameLine.appendChild(roleTag);
+          }
+          textWrap.appendChild(nameLine);
+          if (f.note) {
+            const note = document.createElement('div');
+            note.className = 'founder-note';
+            note.textContent = f.note;
+            textWrap.appendChild(note);
+          }
+          chip.appendChild(textWrap);
+          section.appendChild(chip);
+        });
+      }
+
+      if (profile.offers || profile.looking_for) {
+        const facts = document.createElement('div');
+        facts.className = 'profile-facts';
+        if (profile.offers) {
+          const row = document.createElement('div');
+          row.className = 'profile-fact';
+          row.innerHTML = '<span class="profile-fact-label">Offers</span>';
+          const val = document.createElement('span');
+          val.textContent = profile.offers;
+          row.appendChild(val);
+          facts.appendChild(row);
+        }
+        if (profile.looking_for) {
+          const row = document.createElement('div');
+          row.className = 'profile-fact';
+          row.innerHTML = '<span class="profile-fact-label">Looking for</span>';
+          const val = document.createElement('span');
+          val.textContent = profile.looking_for;
+          row.appendChild(val);
+          facts.appendChild(row);
+        }
+        section.appendChild(facts);
+      }
+
+      return section.childNodes.length ? section : null;
+    }
+
+    function renderMiniContactList(contacts) {
+      const wrap = document.createElement('div');
+      wrap.className = 'mini-contact-list';
+      const emailEntries = Object.entries(contacts.emails || {}).filter(([, list]) => list.length);
+      emailEntries.forEach(([category, emails]) => {
+        emails.forEach((email) => {
+          wrap.appendChild(contactRow(
+            EMAIL_ICON_SVG, '#ea4335', EMAIL_CATEGORY_META[category] || category,
+            email, `mailto:${email}`, email,
+          ));
+        });
+      });
+      Object.entries(contacts.socials || {}).forEach(([name, url]) => {
+        const meta = SOCIAL_META[name] || { label: name, color: '#6b6b68', svg: EMAIL_ICON_SVG };
+        wrap.appendChild(contactRow(meta.svg, meta.color, meta.label, socialHandle(name, url), url));
+      });
+      return wrap;
+    }
+
+    function renderContactsCard(company, contacts, profile, want, requestedFound, similarCompanies, reportId) {
+      const card = document.createElement('div');
+      card.className = 'contact-card';
+
+      const titleRow = document.createElement('div');
+      titleRow.className = 'contact-card-title-row';
+      const title = document.createElement('div');
+      title.className = 'contact-card-title';
+      title.textContent = company ? `Contact info for ${company}` : 'What I found';
+      titleRow.appendChild(title);
+      if (reportId) {
+        const reportLink = document.createElement('a');
+        reportLink.className = 'contact-card-report-link';
+        reportLink.href = `report.html?id=${encodeURIComponent(reportId)}`;
+        reportLink.textContent = 'View full report →';
+        titleRow.appendChild(reportLink);
+      }
+      card.appendChild(titleRow);
+
+      // Be upfront when the specific thing asked for wasn't there, before
+      // showing whatever else was found instead of silently substituting.
+      if (want && want !== 'any' && requestedFound === false) {
+        const GAP_LABELS = {
+          partnership: 'a public partnership email',
+          general: 'a public general/support email',
+          press: 'a public press email',
+          careers: 'a public careers email',
+          social: 'a linked social profile',
+        };
+        const gap = document.createElement('div');
+        gap.className = 'contact-gap-note';
+        gap.textContent = `${company} doesn't have ${GAP_LABELS[want] || `a public ${want}`} on file. Here's everything else found instead:`;
+        card.appendChild(gap);
+      }
+
+      if (profile) {
+        const profileSection = renderProfileSection(profile);
+        if (profileSection) card.appendChild(profileSection);
+      }
+
+      const emailEntries = Object.entries(contacts.emails || {}).filter(([, list]) => list.length);
+      if (emailEntries.length) {
+        const section = document.createElement('div');
+        section.className = 'contact-section';
+        const label = document.createElement('div');
+        label.className = 'contact-section-label';
+        label.textContent = 'Emails';
+        section.appendChild(label);
+        emailEntries.forEach(([category, emails]) => {
+          emails.forEach((email) => {
+            section.appendChild(contactRow(
+              EMAIL_ICON_SVG, '#ea4335',
+              EMAIL_CATEGORY_META[category] || category,
+              email, `mailto:${email}`, email,
+            ));
+          });
+        });
+        card.appendChild(section);
+      }
+
+      const socials = Object.entries(contacts.socials || {});
+      if (socials.length) {
+        const section = document.createElement('div');
+        section.className = 'contact-section';
+        const label = document.createElement('div');
+        label.className = 'contact-section-label';
+        label.textContent = 'Social profiles';
+        section.appendChild(label);
+        socials.forEach(([name, url]) => {
+          const meta = SOCIAL_META[name] || { label: name, color: '#6b6b68', svg: EMAIL_ICON_SVG };
+          section.appendChild(contactRow(meta.svg, meta.color, meta.label, socialHandle(name, url), url));
+        });
+        card.appendChild(section);
+      }
+
+      const unverified = Object.entries(contacts.socials_unverified || {});
+      if (unverified.length) {
+        const section = document.createElement('div');
+        section.className = 'contact-section unverified';
+        const label = document.createElement('div');
+        label.className = 'contact-section-label';
+        label.textContent = 'Unverified';
+        section.appendChild(label);
+        const hint = document.createElement('div');
+        hint.className = 'contact-unverified-hint';
+        hint.textContent = 'Found via search only, not linked from their own site. Double check before trusting.';
+        section.appendChild(hint);
+        unverified.forEach(([name, url]) => {
+          const meta = SOCIAL_META[name] || { label: name, color: '#6b6b68', svg: EMAIL_ICON_SVG };
+          section.appendChild(contactRow(meta.svg, meta.color, meta.label, socialHandle(name, url), url));
+        });
+        card.appendChild(section);
+      }
+
+      if (!emailEntries.length && !socials.length && !unverified.length) {
+        const empty = document.createElement('div');
+        empty.className = 'contact-empty';
+        empty.textContent = 'No public contact info found.';
+        card.appendChild(empty);
+      }
+
+      // Proactive: researched comparable companies without being asked, in
+      // case the user is weighing options rather than fixed on one company.
+      if (similarCompanies && similarCompanies.length) {
+        const section = document.createElement('div');
+        section.className = 'contact-section similar-section';
+        const label = document.createElement('div');
+        label.className = 'contact-section-label';
+        label.textContent = 'Also worth knowing: similar companies';
+        section.appendChild(label);
+        similarCompanies.forEach((peer) => {
+          const peerCard = document.createElement('div');
+          peerCard.className = 'similar-company';
+          const peerTitle = document.createElement('div');
+          peerTitle.className = 'similar-company-title';
+          peerTitle.textContent = peer.name;
+          peerCard.appendChild(peerTitle);
+          peerCard.appendChild(renderMiniContactList(peer.contacts));
+          section.appendChild(peerCard);
+        });
+        card.appendChild(section);
+      }
+
+      const followUp = document.createElement('div');
+      followUp.className = 'contact-follow-up';
+      followUp.textContent = 'Want me to send a message to any of these? Tell me who and what to say, or click "Message" next to an email.';
+      card.appendChild(followUp);
+
+      return card;
+    }
+
+    const SEND_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>';
+
+    function renderOutreachCard(result) {
+      const card = document.createElement('div');
+      card.className = 'outreach-card';
+
+      const header = document.createElement('div');
+      header.className = 'outreach-card-header';
+      const icon = document.createElement('span');
+      icon.className = 'outreach-icon';
+      icon.innerHTML = SEND_ICON_SVG;
+      header.appendChild(icon);
+      const headerText = document.createElement('div');
+      const titleEl = document.createElement('div');
+      titleEl.className = 'outreach-card-title';
+      titleEl.textContent = `Emailing ${result.recipient}`;
+      headerText.appendChild(titleEl);
+      const subEl = document.createElement('div');
+      subEl.className = 'outreach-card-sub';
+      subEl.textContent = "I'll let you know the moment someone responds.";
+      headerText.appendChild(subEl);
+      header.appendChild(headerText);
+      card.appendChild(header);
+
+      if (result.subject || result.preview) {
+        const preview = document.createElement('div');
+        preview.className = 'outreach-preview';
+        if (result.subject) {
+          const subj = document.createElement('div');
+          subj.className = 'outreach-preview-subject';
+          subj.textContent = result.subject;
+          preview.appendChild(subj);
+        }
+        if (result.preview) {
+          const body = document.createElement('div');
+          body.className = 'outreach-preview-text';
+          body.textContent = result.preview;
+          preview.appendChild(body);
+        }
+        card.appendChild(preview);
+      }
+
+      if (result.case_id) {
+        const tag = document.createElement('div');
+        tag.className = 'outreach-case-tag';
+        tag.textContent = `Case ${result.case_id}`;
+        card.appendChild(tag);
+      }
+
+      return card;
+    }
+
+    // Live version: actually calls the backend agent, polls for progress, and
+    // opens the agent activity panel while it works.
+    async function sendToTalonLive(text) {
+      text = text.trim();
+      if (!text) return;
+      const isFirst = !chatStarted;
+      enterChatMode();
+      addBubble('user', text);
+      openAgentPanel();
+
+      const msg = document.createElement('div');
+      msg.className = 'chat-msg agent';
+      const av = document.createElement('span');
+      av.className = 'chat-avatar-mini';
+      av.innerHTML = '<img src="assets/logo.png" alt="">';
+      msg.appendChild(av);
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-bubble typing';
+      bubble.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+      msg.appendChild(bubble);
+      chat.appendChild(msg);
+      chat.scrollTop = chat.scrollHeight;
+
+      try {
+        const startRes = await fetch(`${TALON_API}/api/talon/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        const startData = await startRes.json();
+        if (!startData.job_id) throw new Error(startData.error || 'failed to start');
+
+        let result = null;
+        while (true) {
+          await new Promise((resolve) => setTimeout(resolve, 350));
+          const statusRes = await fetch(`${TALON_API}/api/talon/status/${startData.job_id}`);
+          const statusData = await statusRes.json();
+          renderAgentSteps(statusData.steps || [], statusData.done);
+          if (statusData.done) { result = statusData.result; break; }
+        }
+
+        bubble.classList.remove('typing');
+        if (result && result.kind === 'contacts') {
+          bubble.textContent = '';
+          bubble.appendChild(renderContactsCard(
+            result.company, result.contacts, result.profile,
+            result.want, result.requested_found, result.similar_companies,
+            result.report_id,
+          ));
+        } else if (result && result.kind === 'outreach') {
+          bubble.textContent = '';
+          bubble.appendChild(renderOutreachCard(result));
+        } else {
+          const replyText = (result && result.reply) || 'Something went wrong, try again.';
+          bubble.textContent = isFirst ? `Hi ${displayName}. ${replyText}` : replyText;
+        }
+      } catch (err) {
+        renderAgentSteps(['Lost connection to the backend'], true);
+        bubble.classList.remove('typing');
+        bubble.textContent =
+          `Couldn't reach Talon's backend at ${TALON_API || location.origin} (${err.message}). ` +
+          "Make sure server.py is actually running: `python server.py` in the " +
+          "caspian hackathon folder. This page itself can be served from " +
+          "anywhere (Live Server, direct, etc.), it just needs that process up.";
+        checkBackend();
+      }
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    // --- Backend reachability check, so a wrong origin (file://, a static-file
+    // preview on another port, etc.) is diagnosed immediately instead of only
+    // failing silently the moment you send a message. ---
+    const backendBanner = document.getElementById('backend-banner');
+    async function checkBackend() {
+      try {
+        const res = await fetch(`${TALON_API}/api/health`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        backendBanner.classList.remove('show');
+      } catch (err) {
+        backendBanner.classList.add('show');
+        backendBanner.innerHTML =
+          `Talon's backend isn't reachable at <code>${TALON_API || location.origin}</code> (${err.message}). ` +
+          "Run <code>python server.py</code> in the caspian hackathon folder and leave it " +
+          "running, then reload this page.";
+      }
+    }
+    checkBackend();
+
+    const talonUser = localStorage.getItem('talon_user');
+    if (!talonUser) {
+      window.location.href = 'signin.html';
+    } else {
+      const cleanUser = talonUser.trim();
+      document.getElementById('rail-avatar').textContent = cleanUser.charAt(0).toUpperCase() || 'T';
+
+      // Derive a display name from the email (no name field at signup yet)
+      const localPart = cleanUser.includes('@') ? cleanUser.split('@')[0] : cleanUser;
+      displayName = localPart
+        .replace(/[._]+/g, ' ')
+        .split(' ')
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ') || 'there';
+
+      document.getElementById('hero-heading').textContent = `What do you need Talon to do, ${displayName}?`;
+    }
+
+    function logout() {
+      localStorage.removeItem('talon_user');
+      localStorage.removeItem('talon_onboarded');
+      window.location.href = 'index.html';
+    }
+    document.getElementById('profile-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      logout();
+    });
+
+    const input = document.getElementById('composer-input');
+    document.getElementById('composer-send').addEventListener('click', () => {
+      const text = input.value;
+      input.value = '';
+      sendToTalonLive(text);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('composer-send').click();
+    });
+    document.getElementById('ask-attach').addEventListener('click', () => {
+      enterChatMode();
+      agentReply("Attachments aren't wired up yet.");
+    });
+    document.getElementById('ask-channel-pill').addEventListener('click', () => {
+      enterChatMode();
+      agentReply("Connect an account first from the Connect tab, then I can send through it.");
+    });
+    document.querySelectorAll('.quick-pill').forEach((btn) => {
+      btn.addEventListener('click', () => { sendToTalon(btn.textContent, btn.dataset.note); });
+    });
+  </script>
+</body>
+</html>

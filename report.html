@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talon Reports</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f4f4f3;
+    --panel-2: #ececea;
+    --border: #e4e4e1;
+    --text: #111110;
+    --muted: #6b6b68;
+    --accent: #111110;
+    --online: #4caf7d;
+    --amber: #b8860b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .rail {
+    width: 72px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px 0; gap: 14px;
+  }
+  .rail-logo { display: block; margin-bottom: 22px; }
+  .rail-logo img { height: 20px; width: auto; display: block; }
+  .rail-btn {
+    position: relative; width: 46px; height: 46px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); cursor: pointer; text-decoration: none;
+  }
+  .rail-btn.active { background: var(--panel); color: var(--text); }
+  .rail-btn:hover { background: var(--panel); color: var(--text); }
+  .rail-spacer { flex: 1; }
+  .rail-btn::after {
+    content: attr(data-tip); position: absolute; left: 56px; top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    background: var(--text); color: #fff; font-size: 12px; font-weight: 500;
+    padding: 5px 10px; border-radius: 7px; white-space: nowrap;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease; z-index: 20;
+  }
+  .rail-btn:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+  .rail-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+
+  .main { flex: 1; display: flex; flex-direction: column; }
+  .topbar { display: flex; align-items: center; padding: 18px 28px; border-bottom: 1px solid var(--border); }
+  .topbar h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .back-btn {
+    width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; margin-right: 6px;
+  }
+  .back-btn:hover { background: var(--panel); }
+
+  .content { flex: 1; padding: 28px; max-width: 720px; width: 100%; margin: 0 auto; }
+  .lede { font-size: 13.5px; color: var(--muted); margin: 0 0 22px; max-width: 480px; line-height: 1.5; }
+
+  .empty-state {
+    flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 80px 24px;
+  }
+  .placeholder-icon {
+    width: 64px; height: 64px; border-radius: 16px; background: var(--panel);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); margin-bottom: 20px;
+  }
+  .empty-state h2 { font-size: 19px; margin: 0 0 8px; }
+  .empty-state p { font-size: 14px; color: var(--muted); max-width: 340px; margin: 0; }
+
+  /* List view */
+  .report-list { display: flex; flex-direction: column; gap: 10px; }
+  .report-card {
+    border: 1px solid var(--border); border-radius: 14px; background: var(--panel);
+    padding: 14px 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .report-card:hover { background: var(--panel-2); }
+  .report-card-title { font-size: 14px; font-weight: 600; }
+  .report-card-query { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .report-card-date { font-size: 11.5px; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+
+  /* Detail view */
+  #detail-view { display: none; }
+  .detail-header { margin-bottom: 20px; }
+  .detail-title { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .detail-date { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+  .report-section {
+    border: 1px solid var(--border); border-radius: 16px; background: var(--panel);
+    padding: 16px 18px; margin-bottom: 14px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .report-section-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted);
+  }
+  .why-now-callout {
+    font-size: 13.5px; line-height: 1.55; color: var(--text);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .talking-points { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
+  .talking-points li { margin-bottom: 4px; }
+  .recommended-contact { font-size: 13.5px; line-height: 1.5; }
+
+  .signal-row { display: flex; align-items: flex-start; gap: 11px; }
+  .signal-icon {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .signal-icon svg { width: 15px; height: 15px; }
+  .signal-text { font-size: 13px; line-height: 1.5; }
+  .signal-label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 2px; }
+  .signal-none { color: var(--muted); font-style: italic; }
+
+  .contact-row {
+    display: flex; align-items: center; gap: 11px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 9px 12px;
+  }
+  .contact-icon {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .contact-icon svg { width: 15px; height: 15px; display: block; }
+  .contact-row-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .contact-row-label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .contact-row-value {
+    font-size: 13.5px; color: var(--text); text-decoration: none;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .contact-row-value:hover { text-decoration: underline; }
+
+  .founder-chip {
+    display: flex; align-items: flex-start; gap: 11px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 12px;
+  }
+  .founder-avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+  }
+  .founder-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .founder-name-line { font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .founder-role {
+    font-size: 10.5px; font-weight: 500; color: var(--muted);
+    background: var(--panel-2); border-radius: 999px; padding: 2px 8px;
+  }
+  .founder-note { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+  .similar-company {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 8px; background: var(--bg);
+  }
+  .similar-company-title { font-size: 12.5px; font-weight: 600; }
+  .mini-contact-list { display: flex; flex-direction: column; gap: 8px; }
+  .mini-contact-list .contact-row { border-style: dashed; padding: 7px 10px; }
+  .mini-contact-list .contact-icon { width: 24px; height: 24px; }
+  .mini-contact-list .contact-icon svg { width: 12px; height: 12px; }
+</style>
+</head>
+<body>
+  <div class="rail">
+    <a class="rail-logo" href="index.html"><img src="assets/logo.png" alt="Talon logo"></a>
+    <a class="rail-btn" href="home.html" data-tip="Home">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>
+    </a>
+    <a class="rail-btn" href="cases.html" data-tip="Cases">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+    </a>
+    <a class="rail-btn" href="schedule.html" data-tip="Schedule">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    </a>
+    <a class="rail-btn active" href="report.html" data-tip="Report">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+    </a>
+    <div class="rail-spacer"></div>
+    <a class="rail-btn" href="connect.html" data-tip="Connect">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+    </a>
+    <a class="rail-btn" href="#" id="profile-btn" data-tip="Log out">
+      <span class="rail-avatar" id="rail-avatar">T</span>
+    </a>
+    <a class="rail-btn" href="settings.html" data-tip="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+    </a>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="back-btn" id="topbar-back" aria-label="Back" title="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </button>
+      <h1 id="topbar-title">Reports</h1>
+    </div>
+    <div class="content">
+      <div id="list-view">
+        <p class="lede">Every company Talon looks into gets saved here: contacts, leadership, intent signals, and what to do next. Click any report to reopen it.</p>
+        <div class="report-list" id="report-list"></div>
+        <div class="empty-state" id="empty-state">
+          <div class="placeholder-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+          </div>
+          <h2>No reports yet</h2>
+          <p>Ask Talon to look into a company from Home, and the full research shows up here.</p>
+        </div>
+      </div>
+      <div id="detail-view"></div>
+    </div>
+  </div>
+
+  <script>
+    // Only a local static preview (e.g. Live Server on :5500) needs to be
+    // pointed at the backend explicitly. Everywhere else -- served by
+    // server.py directly on any host/port, including a real deployment --
+    // the API is same-origin, so a relative path is correct.
+    const isLocalStaticPreview = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      && location.port && location.port !== '8744';
+    const TALON_API = isLocalStaticPreview ? 'http://localhost:8744' : '';
+
+    const talonUser = localStorage.getItem('talon_user');
+    if (!talonUser) {
+      window.location.href = 'signin.html';
+    } else {
+      document.getElementById('rail-avatar').textContent = talonUser.trim().charAt(0).toUpperCase() || 'T';
+    }
+    document.getElementById('profile-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.removeItem('talon_user');
+      localStorage.removeItem('talon_onboarded');
+      window.location.href = 'index.html';
+    });
+
+    const EMAIL_CATEGORY_META = {
+      partnership: 'Partnership', general: 'General / Support', press: 'Press',
+      careers: 'Careers', other: 'Other',
+    };
+    const EMAIL_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>';
+    const SOCIAL_META = {
+      linkedin: { label: 'LinkedIn', color: '#0a66c2', svg: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M6.94 8.5H3.56V20h3.38V8.5zM5.25 3.6a1.96 1.96 0 100 3.92 1.96 1.96 0 000-3.92zM20.44 20h-3.37v-5.6c0-1.34-.02-3.05-1.86-3.05-1.87 0-2.16 1.46-2.16 2.96V20H9.68V8.5h3.24v1.57h.05c.45-.86 1.56-1.76 3.21-1.76 3.44 0 4.26 2.26 4.26 5.2V20z"/></svg>' },
+      twitter: { label: 'X / Twitter', color: '#111110', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M4 4l16 16"/><path d="M20 4L4 20"/></svg>' },
+      instagram: { label: 'Instagram', color: '#d6249f', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="0.9" fill="#fff" stroke="none"/></svg>' },
+      facebook: { label: 'Facebook', color: '#1877f2', svg: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M14 9h2.5V6H14c-2 0-3.5 1.6-3.5 3.6V11H8v3h2.5v6H13v-6h2.3l.4-3H13V9.8c0-.5.3-.8.7-.8z"/></svg>' },
+      tiktok: { label: 'TikTok', color: '#111110', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M9 4v11.2a3.3 3.3 0 11-2-3.03"/><path d="M9 4c.4 2.3 2.3 4.2 4.6 4.5"/></svg>' },
+      youtube: { label: 'YouTube', color: '#ff0000', svg: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M9 8.3l7 3.7-7 3.7z"/></svg>' },
+    };
+    const SIGNAL_META = {
+      hiring: { label: 'Hiring', color: '#4caf7d', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>' },
+      funding: { label: 'Funding', color: '#b8860b', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>' },
+      launch: { label: 'Launch', color: '#0a66c2', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2c3 2 4 6 4 9 0 3-1.5 5-4 7-2.5-2-4-4-4-7 0-3 1-7 4-9z"/><path d="M8 15l-3 5M16 15l3 5"/></svg>' },
+    };
+
+    function socialHandle(name, url) {
+      try {
+        const u = new URL(url);
+        const parts = u.pathname.split('/').filter(Boolean);
+        if (name === 'linkedin' || name === 'youtube') return parts.join('/') || u.hostname;
+        const handle = parts[0] || u.hostname;
+        return handle.startsWith('@') ? handle : '@' + handle;
+      } catch (e) { return url; }
+    }
+
+    function contactRow(iconSvg, iconColor, label, valueText, href) {
+      const row = document.createElement('div');
+      row.className = 'contact-row';
+      const icon = document.createElement('span');
+      icon.className = 'contact-icon';
+      icon.style.background = iconColor;
+      icon.innerHTML = iconSvg;
+      row.appendChild(icon);
+      const textWrap = document.createElement('div');
+      textWrap.className = 'contact-row-text';
+      const labelEl = document.createElement('span');
+      labelEl.className = 'contact-row-label';
+      labelEl.textContent = label;
+      textWrap.appendChild(labelEl);
+      const valueEl = document.createElement('a');
+      valueEl.className = 'contact-row-value';
+      valueEl.textContent = valueText;
+      valueEl.href = href;
+      if (!href.startsWith('mailto:')) { valueEl.target = '_blank'; valueEl.rel = 'noopener'; }
+      textWrap.appendChild(valueEl);
+      row.appendChild(textWrap);
+      return row;
+    }
+
+    function initials(name) {
+      return (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+    }
+
+    function founderChip(f) {
+      const chip = document.createElement('div');
+      chip.className = 'founder-chip';
+      const avatar = document.createElement('span');
+      avatar.className = 'founder-avatar';
+      avatar.textContent = initials(f.name);
+      chip.appendChild(avatar);
+      const textWrap = document.createElement('div');
+      textWrap.className = 'founder-text';
+      const nameLine = document.createElement('div');
+      nameLine.className = 'founder-name-line';
+      nameLine.textContent = f.name || 'Unknown';
+      if (f.role) {
+        const roleTag = document.createElement('span');
+        roleTag.className = 'founder-role';
+        roleTag.textContent = f.role;
+        nameLine.appendChild(roleTag);
+      }
+      textWrap.appendChild(nameLine);
+      if (f.note) {
+        const note = document.createElement('div');
+        note.className = 'founder-note';
+        note.textContent = f.note;
+        textWrap.appendChild(note);
+      }
+      chip.appendChild(textWrap);
+      return chip;
+    }
+
+    function section(labelText) {
+      const sec = document.createElement('div');
+      sec.className = 'report-section';
+      const label = document.createElement('div');
+      label.className = 'report-section-label';
+      label.textContent = labelText;
+      sec.appendChild(label);
+      return sec;
+    }
+
+    function renderMiniContactList(contacts) {
+      const wrap = document.createElement('div');
+      wrap.className = 'mini-contact-list';
+      Object.entries(contacts.emails || {}).forEach(([category, emails]) => {
+        (emails || []).forEach((email) => {
+          wrap.appendChild(contactRow(EMAIL_ICON_SVG, '#ea4335', EMAIL_CATEGORY_META[category] || category, email, `mailto:${email}`));
+        });
+      });
+      Object.entries(contacts.socials || {}).forEach(([name, url]) => {
+        const meta = SOCIAL_META[name] || { label: name, color: '#6b6b68', svg: EMAIL_ICON_SVG };
+        wrap.appendChild(contactRow(meta.svg, meta.color, meta.label, socialHandle(name, url), url));
+      });
+      return wrap;
+    }
+
+    function formatDate(ts) {
+      if (!ts) return '';
+      return new Date(ts * 1000).toLocaleString(undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function renderDetail(report) {
+      const payload = report.payload || {};
+      const wrap = document.getElementById('detail-view');
+      wrap.innerHTML = '';
+
+      const header = document.createElement('div');
+      header.className = 'detail-header';
+      const title = document.createElement('div');
+      title.className = 'detail-title';
+      title.textContent = report.title;
+      header.appendChild(title);
+      const date = document.createElement('div');
+      date.className = 'detail-date';
+      date.textContent = `${formatDate(report.created_at)} — from "${report.query}"`;
+      header.appendChild(date);
+      wrap.appendChild(header);
+
+      const suggestions = payload.suggestions || {};
+      const intent = payload.intent || {};
+      if (suggestions.why_now || intent.why_now || suggestions.recommended_contact || (suggestions.talking_points || []).length) {
+        const sec = section('Here’s who to contact, why now, and what they care about');
+        if (suggestions.recommended_contact) {
+          const rec = document.createElement('div');
+          rec.className = 'recommended-contact';
+          rec.innerHTML = `<strong>Contact:</strong> ${suggestions.recommended_contact}`;
+          sec.appendChild(rec);
+        }
+        const whyNow = suggestions.why_now || intent.why_now;
+        if (whyNow) {
+          const callout = document.createElement('div');
+          callout.className = 'why-now-callout';
+          callout.textContent = whyNow;
+          sec.appendChild(callout);
+        }
+        if ((suggestions.talking_points || []).length) {
+          const list = document.createElement('ul');
+          list.className = 'talking-points';
+          suggestions.talking_points.forEach((p) => {
+            const li = document.createElement('li');
+            li.textContent = p;
+            list.appendChild(li);
+          });
+          sec.appendChild(list);
+        }
+        wrap.appendChild(sec);
+      }
+
+      if (intent.hiring || intent.funding || intent.launch) {
+        const sec = section('Intent signals');
+        ['hiring', 'funding', 'launch'].forEach((key) => {
+          if (!intent[key]) return;
+          const meta = SIGNAL_META[key];
+          const row = document.createElement('div');
+          row.className = 'signal-row';
+          const icon = document.createElement('span');
+          icon.className = 'signal-icon';
+          icon.style.background = meta.color;
+          icon.innerHTML = meta.svg;
+          row.appendChild(icon);
+          const text = document.createElement('div');
+          text.className = 'signal-text';
+          text.innerHTML = `<span class="signal-label">${meta.label}</span>${intent[key]}`;
+          row.appendChild(text);
+          sec.appendChild(row);
+        });
+        wrap.appendChild(sec);
+      }
+
+      const profile = payload.profile || {};
+      const people = [...(profile.founders || []), ...(profile.decision_makers || [])];
+      if (profile.about || people.length || profile.offers || profile.looking_for) {
+        const sec = section('Company & leadership');
+        if (profile.about) {
+          const about = document.createElement('div');
+          about.className = 'recommended-contact';
+          about.textContent = profile.about;
+          sec.appendChild(about);
+        }
+        people.forEach((f) => sec.appendChild(founderChip(f)));
+        if (profile.offers) {
+          const row = document.createElement('div');
+          row.className = 'signal-text';
+          row.innerHTML = `<strong>Offers:</strong> ${profile.offers}`;
+          sec.appendChild(row);
+        }
+        if (profile.looking_for) {
+          const row = document.createElement('div');
+          row.className = 'signal-text';
+          row.innerHTML = `<strong>Looking for:</strong> ${profile.looking_for}`;
+          sec.appendChild(row);
+        }
+        wrap.appendChild(sec);
+      }
+
+      const contacts = payload.contacts || {};
+      const emailEntries = Object.entries(contacts.emails || {}).filter(([, list]) => list.length);
+      const socials = Object.entries(contacts.socials || {});
+      if (emailEntries.length || socials.length) {
+        const sec = section('Contacts');
+        emailEntries.forEach(([category, emails]) => {
+          emails.forEach((email) => sec.appendChild(contactRow(EMAIL_ICON_SVG, '#ea4335', EMAIL_CATEGORY_META[category] || category, email, `mailto:${email}`)));
+        });
+        socials.forEach(([name, url]) => {
+          const meta = SOCIAL_META[name] || { label: name, color: '#6b6b68', svg: EMAIL_ICON_SVG };
+          sec.appendChild(contactRow(meta.svg, meta.color, meta.label, socialHandle(name, url), url));
+        });
+        wrap.appendChild(sec);
+      }
+
+      if ((payload.similar_companies || []).length) {
+        const sec = section('Similar companies');
+        payload.similar_companies.forEach((peer) => {
+          const card = document.createElement('div');
+          card.className = 'similar-company';
+          const title = document.createElement('div');
+          title.className = 'similar-company-title';
+          title.textContent = peer.name;
+          card.appendChild(title);
+          card.appendChild(renderMiniContactList(peer.contacts));
+          sec.appendChild(card);
+        });
+        wrap.appendChild(sec);
+      }
+    }
+
+    function showList() {
+      document.getElementById('list-view').style.display = 'block';
+      document.getElementById('detail-view').style.display = 'none';
+      document.getElementById('topbar-title').textContent = 'Reports';
+      history.replaceState(null, '', 'report.html');
+      loadList();
+    }
+
+    async function showDetail(id) {
+      try {
+        const res = await fetch(`${TALON_API}/api/reports/${encodeURIComponent(id)}`);
+        const data = await res.json();
+        if (!data.report) return;
+        renderDetail(data.report);
+        document.getElementById('list-view').style.display = 'none';
+        document.getElementById('detail-view').style.display = 'block';
+        document.getElementById('topbar-title').textContent = data.report.title;
+        history.replaceState(null, '', `report.html?id=${encodeURIComponent(id)}`);
+      } catch (err) {
+        // stay on whatever's currently shown
+      }
+    }
+
+    function renderReportCard(r) {
+      const card = document.createElement('div');
+      card.className = 'report-card';
+      const left = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'report-card-title';
+      title.textContent = r.title;
+      left.appendChild(title);
+      const query = document.createElement('div');
+      query.className = 'report-card-query';
+      query.textContent = `"${r.query}"`;
+      left.appendChild(query);
+      card.appendChild(left);
+      const date = document.createElement('div');
+      date.className = 'report-card-date';
+      date.textContent = formatDate(r.created_at);
+      card.appendChild(date);
+      card.addEventListener('click', () => showDetail(r.id));
+      return card;
+    }
+
+    async function loadList() {
+      try {
+        const res = await fetch(`${TALON_API}/api/reports`);
+        const data = await res.json();
+        const list = document.getElementById('report-list');
+        const empty = document.getElementById('empty-state');
+        const reportsData = data.reports || [];
+        if (!reportsData.length) {
+          list.style.display = 'none';
+          empty.style.display = 'flex';
+          return;
+        }
+        empty.style.display = 'none';
+        list.style.display = 'flex';
+        list.innerHTML = '';
+        reportsData.forEach((r) => list.appendChild(renderReportCard(r)));
+      } catch (err) {
+        // leave whatever was last rendered
+      }
+    }
+
+    document.getElementById('topbar-back').addEventListener('click', () => {
+      if (document.getElementById('detail-view').style.display === 'block') {
+        showList();
+      } else {
+        history.back();
+      }
+    });
+
+    const params = new URLSearchParams(location.search);
+    const initialId = params.get('id');
+    if (initialId) {
+      document.getElementById('list-view').style.display = 'none';
+      showDetail(initialId);
+    } else {
+      loadList();
+    }
+  </script>
+</body>
+</html>
