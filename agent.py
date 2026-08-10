@@ -7,6 +7,7 @@ opening message, not just a one-shot email sender.
 """
 
 import llm
+import reports
 import state
 
 
@@ -30,6 +31,25 @@ def handle_company_reply(client, message) -> None:
     if verdict.get("resolved") or not verdict.get("is_bot"):
         state.mark_resolved(message.conversation_id)
         _notify_user(client, case, verdict.get("user_update", "Update on your case: a real person responded."))
+
+    _relay_findings_to_map(case, verdict.get("findings") or [])
+
+
+def _relay_findings_to_map(case: dict, findings: list[str]) -> None:
+    """A case is Talon actually doing the outreach, not just researching it,
+    so a reply can surface things the background research never would, who
+    really handles this, why they said no, what they need first. Feed that
+    back into the company's report so it shows up on the Map instead of
+    staying stuck in one case's thread."""
+    if not findings:
+        return
+    company = case.get("company")
+    if not company:
+        return
+    report_id = reports.find_latest_report_id_by_company(company)
+    if not report_id:
+        return
+    reports.update_report_findings(report_id, {}, findings)
 
 
 def _notify_user(client, case: dict, text: str) -> None:

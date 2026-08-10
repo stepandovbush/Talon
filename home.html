@@ -1526,6 +1526,12 @@
         bubble.appendChild(renderOutreachCard(result));
       } else if (result && result.kind === 'disambiguate') {
         bubble.appendChild(renderDisambiguationCard(result));
+      } else if (result && result.kind === 'outreach_pending') {
+        const link = document.createElement('a');
+        link.href = 'cases.html';
+        link.textContent = `I sent this to Cases for you to confirm sending to ${result.recipient}. →`;
+        link.style.color = 'inherit';
+        bubble.appendChild(link);
       } else {
         bubble.textContent = (result && result.reply) || 'Something went wrong, try again.';
       }
@@ -1575,6 +1581,18 @@
           renderAgentSteps(statusData.steps || [], statusData.done);
           if (statusData.done) { result = statusData.result; break; }
           await new Promise((resolve) => setTimeout(resolve, 350));
+        }
+
+        // Gmail is connected, so this outreach send needs confirming on
+        // Cases (permission, clarification, mood/style) before it
+        // actually goes out, not a fire-and-forget send from here. Record
+        // it in history first so it makes sense if the user comes back to
+        // Home later, then jump straight to Cases.
+        if (result && result.kind === 'outreach_pending') {
+          appendTurn({ role: 'agent', kind: result.kind, data: result }, result.company || null);
+          clearActiveJob();
+          window.location.href = `cases.html?pending=${encodeURIComponent(jobId)}`;
+          return;
         }
 
         if (!result || (result.kind !== 'contacts' && result.kind !== 'outreach' && result.kind !== 'disambiguate')) {

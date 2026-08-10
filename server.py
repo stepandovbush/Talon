@@ -400,44 +400,104 @@ def _run_talon_job(
                 )
             return
 
-        step("Drafting the outreach email")
-        draft = llm.draft_outreach(text, recipient)
-
-        step(f"Sending to {recipient} through Caspian")
-        try:
-            comm, email_connection_id = _get_comm()
-            result = comm.initiate(email_connection_id, recipient, draft["email_text"])
-        except Exception as exc:
-            _job_finish(
-                job_id,
-                {"kind": "message", "reply": f"I found {recipient} but couldn't send through Caspian: {exc}"},
-            )
+        # Once Gmail is connected, an outreach send is important enough to
+        # confirm first rather than fire immediately, hand off to Cases:
+        # that's where the permission question, clarification, and
+        # mood/style picker live, along with a sidebar to keep chatting
+        # with Talon while deciding. Without Gmail connected, keep the
+        # existing immediate send, unchanged.
+        if google_auth.is_connected():
+            step("Ready to draft, waiting for confirmation on Cases")
+            _job_finish(job_id, {
+                "kind": "outreach_pending",
+                "recipient": recipient,
+                "company": company,
+                "purpose_text": text,
+            })
             return
 
-        email_conversation_id = result.get("conversation_id") or result.get("id")
-        case_id = f"web:{uuid.uuid4().hex[:8]}"
-        state.create_case(
-            email_conversation_id=email_conversation_id,
-            telegram_conversation_id=case_id,
-            recipient=recipient,
-            opening_email=draft["email_text"],
-            channel="web",
-            subject=draft.get("subject"),
-            company=company,
-        )
-        step("Done")
-        _job_finish(
-            job_id,
-            {
-                "kind": "outreach",
-                "recipient": recipient,
-                "subject": draft.get("subject"),
-                "preview": draft.get("email_text"),
-                "case_id": case_id,
-            },
-        )
+        step("Drafting the outreach email")
+        draft = llm.draft_outreach(text, recipient)
+        _send_outreach_and_create_case(job_id, step, recipient, company, draft)
     except Exception as exc:
         _job_finish(job_id, {"kind": "message", "reply": f"Something went wrong: {exc}"})
+
+
+def _send_outreach_and_create_case(job_id: str, step, recipient: str, company: str | None, draft: dict) -> None:
+    """Shared by both the immediate-send path (no Gmail connected) and the
+    confirmed-on-Cases path: actually send through Caspian and open a case
+    to track it. Finishes the job either way, success or failure."""
+    step(f"Sending to {recipient} through Caspian")
+    try:
+        comm, email_connection_id = _get_comm()
+        result = comm.initiate(email_connection_id, recipient, draft["email_text"])
+    except Exception as exc:
+        _job_finish(
+            job_id,
+            {"kind": "message", "reply": f"I found {recipient} but couldn't send through Caspian: {exc}"},
+        )
+        return
+
+    email_conversation_id = result.get("conversation_id") or result.get("id")
+    case_id = f"web:{uuid.uuid4().hex[:8]}"
+    state.create_case(
+        email_conversation_id=email_conversation_id,
+        telegram_conversation_id=case_id,
+        recipient=recipient,
+        opening_email=draft["email_text"],
+        channel="web",
+        subject=draft.get("subject"),
+        company=company,
+    )
+    step("Done")
+    _job_finish(
+        job_id,
+        {
+            "kind": "outreach",
+            "recipient": recipient,
+            "subject": draft.get("subject"),
+            "preview": draft.get("email_text"),
+            "case_id": case_id,
+        },
+    )
+
+
+def _run_confirm_outreach_job(
+    job_id: str, recipient: str, company: str | None, purpose_text: str,
+    clarification: str, style: dict,
+) -> None:
+    """The Cases-side confirmation flow's actual work: draft with the
+    user's chosen mood/style and any clarification they added, then send
+    and open a case, same as the direct-send path once it gets there."""
+    step = lambda message: _job_step(job_id, message)  # noqa: E731
+    try:
+        step("Drafting with your chosen style")
+        draft = llm.draft_outreach_styled(purpose_text, recipient, clarification, style)
+        _send_outreach_and_create_case(job_id, step, recipient, company, draft)
+    except Exception as exc:
+        _job_finish(job_id, {"kind": "message", "reply": f"Something went wrong: {exc}"})
+
+
+@app.route("/api/talon/confirm_outreach", methods=["POST"])
+def talon_confirm_outreach():
+    data = request.get_json(force=True, silent=True) or {}
+    recipient = (data.get("recipient") or "").strip()
+    if not recipient:
+        return jsonify(error="Missing recipient."), 400
+    company = (data.get("company") or "").strip() or None
+    purpose_text = (data.get("purpose_text") or "").strip()
+    clarification = (data.get("clarification") or "").strip()
+    style = data.get("style") or {}
+
+    job_id = uuid.uuid4().hex[:12]
+    with _jobs_lock:
+        _jobs[job_id] = {"steps": [], "done": False, "result": None}
+    threading.Thread(
+        target=_run_confirm_outreach_job,
+        args=(job_id, recipient, company, purpose_text, clarification, style),
+        daemon=True,
+    ).start()
+    return jsonify(job_id=job_id)
 
 
 @app.route("/api/talon/start", methods=["POST"])

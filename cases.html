@@ -96,7 +96,80 @@
   }
   .back-btn:hover { background: var(--panel); }
 
-  .content { flex: 1; padding: 28px; max-width: 760px; width: 100%; margin: 0 auto; }
+  .body-row { flex: 1; display: flex; min-height: 0; }
+  .content { flex: 1; padding: 28px; max-width: 760px; width: 100%; margin: 0 auto; overflow-y: auto; }
+
+  .sidebar-toggle {
+    width: 34px; height: 34px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; margin-left: auto;
+  }
+  .sidebar-toggle:hover { background: var(--panel); }
+  .sidebar-toggle.active { background: var(--text); color: #fff; border-color: var(--text); }
+
+  .chat-sidebar {
+    width: 360px; flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    background: var(--panel);
+  }
+  .chat-sidebar.collapsed { display: none; }
+  .chat-sidebar-header {
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    font-size: 13px; font-weight: 600;
+  }
+  .chat-sidebar-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .sb-msg { font-size: 13px; line-height: 1.5; max-width: 92%; }
+  .sb-msg.user { align-self: flex-end; background: var(--text); color: #fff; border-radius: 12px 12px 2px 12px; padding: 8px 12px; }
+  .sb-msg.agent { align-self: flex-start; background: var(--bg); border: 1px solid var(--border); border-radius: 12px 12px 12px 2px; padding: 8px 12px; }
+  .sb-msg.agent a { color: inherit; }
+  .chat-sidebar-composer { padding: 12px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+  .chat-sidebar-composer input {
+    flex: 1; font-size: 13px; padding: 9px 12px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    font-family: inherit;
+  }
+  .chat-sidebar-composer input:focus { outline: none; border-color: var(--text); }
+  .chat-sidebar-composer button {
+    width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+    border: none; background: var(--text); color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chat-sidebar-composer button:disabled { opacity: 0.5; cursor: default; }
+
+  .pending-card {
+    border: 1px solid var(--border); border-radius: 16px;
+    background: var(--panel); padding: 20px 22px; margin-bottom: 20px;
+  }
+  .pending-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .pending-sub { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+  .pending-sub b { color: var(--text); }
+  .pending-field { margin-bottom: 14px; }
+  .pending-field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+  .pending-field textarea, .pending-field input[type="text"] {
+    width: 100%; font-size: 13px; padding: 9px 12px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    font-family: inherit; box-sizing: border-box; resize: vertical;
+  }
+  .pending-field textarea:focus, .pending-field input[type="text"]:focus { outline: none; border-color: var(--text); }
+  .mood-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .mood-chip {
+    font-size: 12.5px; font-weight: 500; padding: 7px 14px;
+    border-radius: 999px; border: 1px solid var(--border); background: var(--bg);
+    color: var(--text); cursor: pointer;
+  }
+  .mood-chip.selected { background: var(--text); color: #fff; border-color: var(--text); }
+  .toggle-row { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .toggle-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .pending-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .pending-actions button {
+    font-size: 13px; font-weight: 500; padding: 9px 18px; border-radius: 9px; cursor: pointer;
+  }
+  .pending-send { border: none; background: var(--text); color: #fff; }
+  .pending-send:disabled { opacity: 0.5; cursor: default; }
+  .pending-cancel { border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  .pending-status { font-size: 12.5px; color: var(--muted); margin-top: 12px; }
 
   .empty-state {
     flex-direction: column; align-items: center; justify-content: center;
@@ -201,15 +274,31 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
       </button>
       <h1>Cases</h1>
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Talk to Talon" title="Talk to Talon">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v12H7l-3 3V4z"/></svg>
+      </button>
     </div>
-    <div class="content">
-      <div class="cases-list" id="cases-list"></div>
-      <div class="empty-state" id="empty-state">
-        <div class="placeholder-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+    <div class="body-row">
+      <div class="content">
+        <div id="pending-wrap"></div>
+        <div class="cases-list" id="cases-list"></div>
+        <div class="empty-state" id="empty-state">
+          <div class="placeholder-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+          </div>
+          <h2>No cases yet</h2>
+          <p>Ask Talon to email someone from Home, and the case shows up here, along with everything it does after: bot detection, escalation, and follow-ups.</p>
         </div>
-        <h2>No cases yet</h2>
-        <p>Ask Talon to email someone from Home, and the case shows up here, along with everything it does after: bot detection, escalation, and follow-ups.</p>
+      </div>
+      <div class="chat-sidebar collapsed" id="chat-sidebar">
+        <div class="chat-sidebar-header">Talk to Talon</div>
+        <div class="chat-sidebar-body" id="sidebar-body"></div>
+        <div class="chat-sidebar-composer">
+          <input type="text" id="sidebar-input" placeholder="Tell Talon what you're stuck on...">
+          <button type="button" id="sidebar-send" aria-label="Send">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -338,6 +427,316 @@
       }
     }
 
+    // --- Sidebar chat: same transcript key home.html writes to, so this is
+    // genuinely the same conversation continued from a different page, not
+    // a separate mini-chat. Rendering here is simplified on purpose (text
+    // summaries instead of full contact/disambiguation cards), the rich
+    // version stays on Home, this is for keeping the conversation going
+    // without losing the Cases view.
+    const TRANSCRIPT_KEY = 'talon_chat_history';
+
+    function loadTranscript() {
+      try {
+        return JSON.parse(localStorage.getItem(TRANSCRIPT_KEY)) || { turns: [], lastCompany: null };
+      } catch (e) {
+        return { turns: [], lastCompany: null };
+      }
+    }
+    function saveTranscript(t) {
+      localStorage.setItem(TRANSCRIPT_KEY, JSON.stringify(t));
+    }
+    function appendTurn(turn, company) {
+      const t = loadTranscript();
+      t.turns.push(turn);
+      if (t.turns.length > 60) t.turns = t.turns.slice(-60);
+      if (company) t.lastCompany = company;
+      saveTranscript(t);
+    }
+
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const chatSidebar = document.getElementById('chat-sidebar');
+    const sidebarBody = document.getElementById('sidebar-body');
+    const sidebarInput = document.getElementById('sidebar-input');
+    const sidebarSend = document.getElementById('sidebar-send');
+
+    sidebarToggle.addEventListener('click', () => {
+      const opening = chatSidebar.classList.contains('collapsed');
+      chatSidebar.classList.toggle('collapsed');
+      sidebarToggle.classList.toggle('active', opening);
+      if (opening) sidebarInput.focus();
+    });
+
+    function sbBubble(role) {
+      const el = document.createElement('div');
+      el.className = `sb-msg ${role}`;
+      sidebarBody.appendChild(el);
+      sidebarBody.scrollTop = sidebarBody.scrollHeight;
+      return el;
+    }
+
+    function sbSummaryFor(result) {
+      if (!result) return 'Something went wrong, try again.';
+      if (result.kind === 'contacts') {
+        return `Found contact info for ${result.company || 'that'}. See it on Home or the Report tab.`;
+      }
+      if (result.kind === 'outreach') {
+        return `Sent to ${result.recipient}. Check the case below.`;
+      }
+      if (result.kind === 'disambiguate') {
+        return `A few companies go by "${result.name}", head to Home to pick which one.`;
+      }
+      if (result.kind === 'outreach_pending') {
+        return `Ready to draft an email to ${result.recipient}, confirm it above.`;
+      }
+      return result.reply || 'Something went wrong, try again.';
+    }
+
+    function renderSidebarTurn(turn) {
+      if (turn.role === 'user') {
+        sbBubble('user').textContent = turn.text;
+        return;
+      }
+      sbBubble('agent').textContent = sbSummaryFor(turn.data);
+    }
+
+    async function sidebarPoll(jobId) {
+      const bubble = sbBubble('agent');
+      bubble.textContent = 'Working on it...';
+      try {
+        let result = null;
+        while (true) {
+          const res = await fetch(`${TALON_API}/api/talon/status/${jobId}`);
+          const data = await res.json();
+          if (data.done) { result = data.result; break; }
+          await new Promise((r) => setTimeout(r, 500));
+        }
+        if (result && result.kind === 'outreach_pending') {
+          bubble.textContent = 'Ready to draft, confirm it above.';
+          appendTurn({ role: 'agent', kind: result.kind, data: result }, result.company || null);
+          showPendingCard(result, jobId);
+          history.replaceState({}, '', `cases.html?pending=${encodeURIComponent(jobId)}`);
+          loadCases();
+          return;
+        }
+        bubble.textContent = sbSummaryFor(result);
+        appendTurn({ role: 'agent', kind: (result && result.kind) || 'message', data: result }, (result && result.company) || null);
+        if (result && (result.kind === 'outreach' || result.kind === 'contacts')) loadCases();
+      } catch (err) {
+        bubble.textContent = `Couldn't reach Talon's backend (${err.message}).`;
+      }
+    }
+
+    async function sendSidebarMessage() {
+      const text = sidebarInput.value.trim();
+      if (!text) return;
+      sidebarInput.value = '';
+      sidebarSend.disabled = true;
+      sbBubble('user').textContent = text;
+      appendTurn({ role: 'user', text });
+      try {
+        const startRes = await fetch(`${TALON_API}/api/talon/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, context_company: loadTranscript().lastCompany || '' }),
+        });
+        const startData = await startRes.json();
+        if (!startData.job_id) throw new Error(startData.error || 'failed to start');
+        await sidebarPoll(startData.job_id);
+      } catch (err) {
+        sbBubble('agent').textContent = `Couldn't reach Talon's backend (${err.message}).`;
+      }
+      sidebarSend.disabled = false;
+      sidebarInput.focus();
+    }
+
+    sidebarSend.addEventListener('click', sendSidebarMessage);
+    sidebarInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendSidebarMessage(); });
+
+    loadTranscript().turns.forEach(renderSidebarTurn);
+
+    // --- Pending outreach confirmation: permission, clarification, and a
+    // mood/style picker before Talon actually drafts and sends anything.
+    const pendingWrap = document.getElementById('pending-wrap');
+    let selectedMood = 'neutral';
+
+    function showPendingCard(result, jobId) {
+      pendingWrap.innerHTML = '';
+      const card = document.createElement('div');
+      card.className = 'pending-card';
+
+      const title = document.createElement('div');
+      title.className = 'pending-title';
+      title.textContent = 'Send this email?';
+      card.appendChild(title);
+
+      const sub = document.createElement('div');
+      sub.className = 'pending-sub';
+      sub.innerHTML = `Talon is ready to email <b>${escapeHtml(result.recipient)}</b> about: "${escapeHtml(result.purpose_text || '')}"`;
+      card.appendChild(sub);
+
+      const clarifyField = document.createElement('div');
+      clarifyField.className = 'pending-field';
+      clarifyField.innerHTML = '<label>Anything to clarify or add before Talon drafts this? (optional)</label>';
+      const clarifyInput = document.createElement('textarea');
+      clarifyInput.rows = 2;
+      clarifyInput.placeholder = 'e.g. mention we spoke at a conference last month';
+      clarifyField.appendChild(clarifyInput);
+      card.appendChild(clarifyField);
+
+      const moodField = document.createElement('div');
+      moodField.className = 'pending-field';
+      moodField.innerHTML = '<label>Mood</label>';
+      const moodRow = document.createElement('div');
+      moodRow.className = 'mood-row';
+      selectedMood = 'neutral';
+      [['neutral', 'Neutral'], ['lively', 'Lively'], ['sad', 'Sad']].forEach(([value, label]) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'mood-chip' + (value === 'neutral' ? ' selected' : '');
+        chip.textContent = label;
+        chip.addEventListener('click', () => {
+          selectedMood = value;
+          moodRow.querySelectorAll('.mood-chip').forEach((c) => c.classList.remove('selected'));
+          chip.classList.add('selected');
+        });
+        moodRow.appendChild(chip);
+      });
+      moodField.appendChild(moodRow);
+      card.appendChild(moodField);
+
+      const toggleRow = document.createElement('div');
+      toggleRow.className = 'toggle-row';
+      const noEmDashLabel = document.createElement('label');
+      noEmDashLabel.className = 'toggle-item';
+      const noEmDashCheck = document.createElement('input');
+      noEmDashCheck.type = 'checkbox';
+      noEmDashCheck.checked = true;
+      noEmDashLabel.appendChild(noEmDashCheck);
+      noEmDashLabel.append('No em dashes');
+      toggleRow.appendChild(noEmDashLabel);
+
+      const humanLabel = document.createElement('label');
+      humanLabel.className = 'toggle-item';
+      const humanCheck = document.createElement('input');
+      humanCheck.type = 'checkbox';
+      humanCheck.checked = true;
+      humanLabel.appendChild(humanCheck);
+      humanLabel.append('Make it sound human, not corporate');
+      toggleRow.appendChild(humanLabel);
+      card.appendChild(toggleRow);
+
+      const customField = document.createElement('div');
+      customField.className = 'pending-field';
+      customField.style.marginTop = '12px';
+      customField.innerHTML = '<label>Anything else to personalize it? (optional)</label>';
+      const customInput = document.createElement('input');
+      customInput.type = 'text';
+      customInput.placeholder = 'e.g. keep it under 100 words';
+      customField.appendChild(customInput);
+      card.appendChild(customField);
+
+      const statusEl = document.createElement('div');
+      statusEl.className = 'pending-status';
+
+      const actions = document.createElement('div');
+      actions.className = 'pending-actions';
+      const sendBtn = document.createElement('button');
+      sendBtn.className = 'pending-send';
+      sendBtn.type = 'button';
+      sendBtn.textContent = 'Send it';
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'pending-cancel';
+      cancelBtn.type = 'button';
+      cancelBtn.textContent = 'Not now';
+      actions.appendChild(sendBtn);
+      actions.appendChild(cancelBtn);
+      card.appendChild(actions);
+      card.appendChild(statusEl);
+
+      cancelBtn.addEventListener('click', () => {
+        pendingWrap.innerHTML = '';
+        history.replaceState({}, '', 'cases.html');
+      });
+
+      sendBtn.addEventListener('click', async () => {
+        sendBtn.disabled = true;
+        cancelBtn.disabled = true;
+        statusEl.textContent = 'Drafting and sending...';
+        try {
+          const res = await fetch(`${TALON_API}/api/talon/confirm_outreach`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recipient: result.recipient,
+              company: result.company,
+              purpose_text: result.purpose_text,
+              clarification: clarifyInput.value.trim(),
+              style: {
+                mood: selectedMood,
+                no_em_dashes: noEmDashCheck.checked,
+                sound_human: humanCheck.checked,
+                custom: customInput.value.trim(),
+              },
+            }),
+          });
+          const data = await res.json();
+          if (!data.job_id) throw new Error(data.error || 'failed to start');
+          while (true) {
+            const statusRes = await fetch(`${TALON_API}/api/talon/status/${data.job_id}`);
+            const statusData = await statusRes.json();
+            const steps = statusData.steps || [];
+            if (steps.length) statusEl.textContent = steps[steps.length - 1];
+            if (statusData.done) {
+              const finalResult = statusData.result;
+              if (finalResult && finalResult.kind === 'outreach') {
+                statusEl.textContent = `Sent to ${finalResult.recipient}.`;
+                appendTurn({ role: 'agent', kind: 'outreach', data: finalResult }, result.company || null);
+                pendingWrap.innerHTML = '';
+                history.replaceState({}, '', 'cases.html');
+                loadCases();
+              } else {
+                statusEl.textContent = (finalResult && finalResult.reply) || 'Something went wrong, try again.';
+                sendBtn.disabled = false;
+                cancelBtn.disabled = false;
+              }
+              break;
+            }
+            await new Promise((r) => setTimeout(r, 500));
+          }
+        } catch (err) {
+          statusEl.textContent = `Couldn't reach Talon's backend (${err.message}).`;
+          sendBtn.disabled = false;
+          cancelBtn.disabled = false;
+        }
+      });
+
+      pendingWrap.innerHTML = '';
+      pendingWrap.appendChild(card);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function checkPending() {
+      const params = new URLSearchParams(window.location.search);
+      const jobId = params.get('pending');
+      if (!jobId) return;
+      try {
+        const res = await fetch(`${TALON_API}/api/talon/status/${jobId}`);
+        const data = await res.json();
+        if (data.done && data.result && data.result.kind === 'outreach_pending') {
+          showPendingCard(data.result, jobId);
+        }
+      } catch (err) {
+        // leave the page as-is, the sidebar chat still works even if this
+        // specific lookup fails
+      }
+    }
+
+    checkPending();
     loadCases();
     setInterval(loadCases, 8000);
   </script>

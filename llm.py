@@ -406,6 +406,42 @@ def draft_outreach(user_request: str, recipient: str) -> dict:
     return _ask_json(system, json.dumps({"recipient": recipient, "request": user_request}))
 
 
+def draft_outreach_styled(user_request: str, recipient: str, clarification: str, style: dict) -> dict:
+    """Same as draft_outreach, but for the confirmed-on-Cases flow: takes
+    whatever the user added when asked to clarify before drafting, plus a
+    mood/tone the user picked, so the email actually sounds like something
+    they'd have written, not a generic template."""
+    mood = (style or {}).get("mood") or "neutral"
+    mood_lines = {
+        "lively": "Write with an upbeat, energetic tone, genuinely enthusiastic without overdoing it.",
+        "sad": "Write with a subdued, disappointed tone, this is a frustrating situation, let that come through honestly without being dramatic.",
+        "neutral": "Write with a level, matter-of-fact tone.",
+    }
+    instructions = [mood_lines.get(mood, mood_lines["neutral"])]
+    if (style or {}).get("sound_human", True):
+        instructions.append(
+            "Write like an actual person typed this quickly, not like corporate "
+            "boilerplate or an obviously AI-generated template, contractions and "
+            "a natural rhythm are fine."
+        )
+    if (style or {}).get("custom"):
+        instructions.append(f"Also: {style['custom']}")
+    no_em_dashes = (style or {}).get("no_em_dashes", True)
+
+    system = (
+        "You are Talon, an agent that reaches companies on a user's behalf. "
+        "The user described what they need. Draft a direct opening email to "
+        "the given recipient describing it and asking for help. Sign it as "
+        "Talon, writing on behalf of the user. " + " ".join(instructions) + " "
+        "Write in plain active voice, using only commas and periods for "
+        "punctuation. " + ("Never use an em dash or en dash. " if no_em_dashes else "") +
+        'Respond as JSON: {"subject": string, "email_text": string}.'
+    )
+    return _ask_json(system, json.dumps({
+        "recipient": recipient, "request": user_request, "clarification": clarification or "",
+    }))
+
+
 def draft_follow_up(history_text: str) -> dict:
     """No reply has come in for a while. Draft a brief, polite check-in nudge
     into the same thread, referencing what's already been asked so it reads
@@ -434,10 +470,22 @@ def evaluate_reply(history_text: str) -> dict:
         "email that explicitly asks for a human representative, and mentions that "
         "basic troubleshooting was already tried so it should not be repeated. "
         "If a real person has responded, or the issue is resolved, set "
-        "next_email_text to null. Write in plain active voice, using only "
-        "commas and periods for punctuation. Never use an em dash or en dash. "
+        "next_email_text to null. Separately, pull out anything factually new "
+        "the latest reply reveals that's worth remembering beyond this one "
+        "conversation, a different real contact name or role than who was "
+        "originally emailed, a stated reason or objection, a concrete next "
+        "step or timeline they gave. Only include something if it's actually "
+        "stated in the reply, never infer or guess one, and skip this "
+        "entirely if the reply is just an acknowledgment or a bot's canned "
+        "response with nothing substantive in it. Write in plain active "
+        "voice, using only commas and periods for punctuation. Never use an "
+        "em dash or en dash. "
         'Respond as JSON: {"is_bot": bool, "resolved": bool, '
-        '"next_email_text": string or null, "user_update": string} where '
-        "user_update is a short message telling the user what just happened."
+        '"next_email_text": string or null, "user_update": string, '
+        '"findings": [string]} where user_update is a short message telling '
+        "the user what just happened, and findings is a list of short "
+        "factual notes (empty list if nothing new), each written as a "
+        'standalone sentence, e.g. "Reply named Sarah as the actual '
+        'partnerships contact, not the general inbox."'
     )
     return _ask_json(system, history_text)

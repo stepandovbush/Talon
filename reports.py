@@ -69,6 +69,25 @@ def get_report(report_id: str) -> dict | None:
     return {**report, "id": report_id}
 
 
+def find_latest_report_id_by_company(company: str) -> str | None:
+    """The most recent report on a company, by name, case-insensitive --
+    used to route a finding from a live case (a reply revealed something
+    new) to the right place on the Map, without the caller needing to
+    already know the report id."""
+    if not company:
+        return None
+    data = _load()
+    matches = [
+        (report_id, report["created_at"])
+        for report_id, report in data["reports"].items()
+        if (report.get("company") or "").strip().lower() == company.strip().lower()
+    ]
+    if not matches:
+        return None
+    matches.sort(key=lambda pair: pair[1], reverse=True)
+    return matches[0][0]
+
+
 def update_report_findings(report_id: str, payload_updates: dict, change_notes: list[str]) -> None:
     """Merge freshly re-checked fields (intent signals, similar companies)
     into an existing report from the background Map-refresh agent. Stamps
