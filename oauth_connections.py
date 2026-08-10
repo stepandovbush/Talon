@@ -1,24 +1,21 @@
-"""OAuth connections for Slack, LinkedIn, and X.
+"""OAuth connections for Slack and LinkedIn.
 
 Same single-user, local-file token pattern as google_auth.py -- one
 person's own accounts, no multi-user system. Each of these needs its own
 OAuth app registered on that platform's own developer portal (Slack API,
-LinkedIn Developers, X Developer Portal), which only the account owner
-can create, that's a one-time setup only the user can do themselves, same
-as Gmail. Until the matching CLIENT_ID/SECRET env vars are set, the
-Connect button just explains that instead of failing silently.
+LinkedIn Developers), which only the account owner can create, that's a
+one-time setup only the user can do themselves, same as Gmail. Until the
+matching CLIENT_ID/SECRET env vars are set, the Connect button just
+explains that instead of failing silently.
 
 Generic across providers since the OAuth 2.0 authorization-code shape is
-identical for all three, only endpoints/scopes differ, X additionally
-requires PKCE, and Slack requests user-level scopes under a differently
-named query param and nests its token response under "authed_user".
+identical for both, only endpoints/scopes differ, and Slack requests
+user-level scopes under a differently named query param and nests its
+token response under "authed_user".
 """
 
-import base64
-import hashlib
 import json
 import os
-import secrets
 import time
 
 import requests
@@ -38,7 +35,6 @@ PROVIDERS = {
         "client_secret_env": "SLACK_OAUTH_CLIENT_SECRET",
         "redirect_env": "SLACK_OAUTH_REDIRECT_URI",
         "redirect_default": "http://localhost:8744/api/slack/callback",
-        "pkce": False,
     },
     "linkedin": {
         "auth_endpoint": "https://www.linkedin.com/oauth/v2/authorization",
@@ -52,17 +48,6 @@ PROVIDERS = {
         "client_secret_env": "LINKEDIN_OAUTH_CLIENT_SECRET",
         "redirect_env": "LINKEDIN_OAUTH_REDIRECT_URI",
         "redirect_default": "http://localhost:8744/api/linkedin/callback",
-        "pkce": False,
-    },
-    "x": {
-        "auth_endpoint": "https://twitter.com/i/oauth2/authorize",
-        "token_endpoint": "https://api.twitter.com/2/oauth2/token",
-        "scope": "tweet.read users.read offline.access",
-        "client_id_env": "X_OAUTH_CLIENT_ID",
-        "client_secret_env": "X_OAUTH_CLIENT_SECRET",
-        "redirect_env": "X_OAUTH_REDIRECT_URI",
-        "redirect_default": "http://localhost:8744/api/x/callback",
-        "pkce": True,
     },
 }
 
@@ -81,18 +66,8 @@ def redirect_uri(provider: str) -> str:
     return os.environ.get(cfg["redirect_env"], cfg["redirect_default"])
 
 
-def _new_pkce_pair() -> tuple[str, str]:
-    verifier = base64.urlsafe_b64encode(secrets.token_bytes(40)).rstrip(b"=").decode()
-    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
-    return verifier, challenge
-
-
-def build_auth_url(provider: str, state: str) -> tuple[str, str | None]:
-    """Returns (authorize_url, code_verifier). code_verifier is None for
-    providers that don't use PKCE, the caller must hang onto it (keyed by
-    state) to pass back into exchange_code at callback time."""
+def build_auth_url(provider: str, state: str) -> str:
     cfg = PROVIDERS[provider]
-    code_verifier = None
     params = {
         "client_id": os.environ[cfg["client_id_env"]],
         "redirect_uri": redirect_uri(provider),
@@ -100,31 +75,20 @@ def build_auth_url(provider: str, state: str) -> tuple[str, str | None]:
         cfg.get("scope_param", "scope"): cfg["scope"],
         "state": state,
     }
-    if cfg["pkce"]:
-        code_verifier, challenge = _new_pkce_pair()
-        params["code_challenge"] = challenge
-        params["code_challenge_method"] = "S256"
     query = "&".join(f"{k}={requests.utils.quote(v)}" for k, v in params.items())
-    return f"{cfg['auth_endpoint']}?{query}", code_verifier
+    return f"{cfg['auth_endpoint']}?{query}"
 
 
-def exchange_code(provider: str, code: str, code_verifier: str | None) -> dict:
+def exchange_code(provider: str, code: str) -> dict:
     cfg = PROVIDERS[provider]
     data = {
         "code": code,
         "client_id": os.environ[cfg["client_id_env"]],
+        "client_secret": os.environ[cfg["client_secret_env"]],
         "redirect_uri": redirect_uri(provider),
         "grant_type": "authorization_code",
     }
-    auth = None
-    if provider == "x":
-        # X authenticates the token request with HTTP Basic (client_id:secret)
-        # rather than a body param, and requires the PKCE verifier back.
-        auth = (os.environ[cfg["client_id_env"]], os.environ[cfg["client_secret_env"]])
-        data["code_verifier"] = code_verifier
-    else:
-        data["client_secret"] = os.environ[cfg["client_secret_env"]]
-    resp = requests.post(cfg["token_endpoint"], data=data, auth=auth, timeout=15)
+    resp = requests.post(cfg["token_endpoint"], data=data, timeout=15)
     resp.raise_for_status()
     result = resp.json()
 
@@ -194,14 +158,10 @@ def get_valid_access_token(provider: str) -> str | None:
     data = {
         "refresh_token": refresh_token,
         "client_id": os.environ[cfg["client_id_env"]],
+        "client_secret": os.environ[cfg["client_secret_env"]],
         "grant_type": "refresh_token",
     }
-    auth = None
-    if provider == "x":
-        auth = (os.environ[cfg["client_id_env"]], os.environ[cfg["client_secret_env"]])
-    else:
-        data["client_secret"] = os.environ[cfg["client_secret_env"]]
-    resp = requests.post(cfg["token_endpoint"], data=data, auth=auth, timeout=15)
+    resp = requests.post(cfg["token_endpoint"], data=data, timeout=15)
     if not resp.ok:
         return None
     refreshed = resp.json()

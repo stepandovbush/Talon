@@ -595,10 +595,10 @@ def github_disconnect():
     return jsonify(ok=True)
 
 
-# Slack, LinkedIn, and X all use the same OAuth 2.0 authorization-code
-# shape (oauth_connections.py), one small route set per provider so the
-# URLs stay predictable, but sharing all the actual logic.
-_oauth_pending: dict[str, dict] = {}
+# Slack and LinkedIn both use the same OAuth 2.0 authorization-code shape
+# (oauth_connections.py), one small route set per provider so the URLs
+# stay predictable, but sharing all the actual logic.
+_oauth_pending: dict[str, str] = {}
 
 _PROVIDER_UNCONFIGURED_NOTES = {
     "slack": (
@@ -622,14 +622,6 @@ _PROVIDER_UNCONFIGURED_NOTES = {
         "LinkedIn's own partner approval, which is outside what this "
         "button can offer."
     ),
-    "x": (
-        "X isn't connected yet, this button can't finish the OAuth flow on "
-        "its own. To wire it up: create a project and app at "
-        "developer.x.com, enable OAuth 2.0 with a Web app redirect URI, "
-        "and set X_OAUTH_CLIENT_ID plus X_OAUTH_CLIENT_SECRET and "
-        "X_OAUTH_REDIRECT_URI in .env. That's a one time setup only you "
-        "can do, since it needs your own X developer account."
-    ),
 }
 
 
@@ -646,9 +638,8 @@ def _register_oauth_routes(provider: str) -> None:
         if not oauth_connections.is_configured(provider):
             return jsonify(error=_PROVIDER_UNCONFIGURED_NOTES[provider]), 501
         state = uuid.uuid4().hex
-        auth_url, code_verifier = oauth_connections.build_auth_url(provider, state)
-        _oauth_pending[provider] = {"state": state, "verifier": code_verifier}
-        return redirect(auth_url)
+        _oauth_pending[provider] = state
+        return redirect(oauth_connections.build_auth_url(provider, state))
 
     @app.route(f"/api/{provider}/callback", endpoint=f"{provider}_callback")
     def _callback():
@@ -658,13 +649,13 @@ def _register_oauth_routes(provider: str) -> None:
 
         code = request.args.get("code")
         returned_state = request.args.get("state")
-        pending = _oauth_pending.get(provider)
-        if not code or not pending or returned_state != pending.get("state"):
+        pending_state = _oauth_pending.get(provider)
+        if not code or not pending_state or returned_state != pending_state:
             return redirect(f"/connect.html?{provider}=error&reason=invalid_state")
         _oauth_pending.pop(provider, None)
 
         try:
-            tokens = oauth_connections.exchange_code(provider, code, pending.get("verifier"))
+            tokens = oauth_connections.exchange_code(provider, code)
             oauth_connections.save_from_code_exchange(provider, tokens)
         except Exception:
             return redirect(f"/connect.html?{provider}=error&reason=token_exchange_failed")
@@ -677,7 +668,7 @@ def _register_oauth_routes(provider: str) -> None:
         return jsonify(ok=True)
 
 
-for _provider in ("slack", "linkedin", "x"):
+for _provider in ("slack", "linkedin"):
     _register_oauth_routes(_provider)
 
 

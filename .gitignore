@@ -9,5 +9,4 @@ users.db
 google_tokens.json
 slack_tokens.json
 linkedin_tokens.json
-x_tokens.json
 github_token.json
