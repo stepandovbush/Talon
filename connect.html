@@ -234,13 +234,22 @@
 
         <div class="connect-card">
           <div class="connect-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M9 2a2 2 0 100 4h2V4a2 2 0 00-2-2z"/>
+              <path d="M9 9H4a2 2 0 100 4h5a2 2 0 000-4z"/>
+              <path d="M15 22a2 2 0 100-4h-2v2a2 2 0 002 2z"/>
+              <path d="M15 15h5a2 2 0 100-4h-5a2 2 0 000 4z"/>
+              <path d="M15 9a2 2 0 100-4h-2v2a2 2 0 002 2z"/>
+              <path d="M15 9h5a2 2 0 100-4h-5a2 2 0 000 4z"/>
+              <path d="M9 15a2 2 0 100 4h2v-2a2 2 0 00-2-2z"/>
+              <path d="M9 15H4a2 2 0 100 4h5a2 2 0 000-4z"/>
+            </svg>
           </div>
           <div class="connect-main">
-            <div class="connect-name">Outlook / Mail</div>
+            <div class="connect-name">Slack</div>
             <div class="connect-status">Not connected</div>
           </div>
-          <button class="connect-btn" data-provider="outlook" data-name="Outlook" data-note="Outlook isn't connected yet, this button can't finish the OAuth flow on its own. To wire it up: register an app at portal.azure.com (Azure Entra ID > App registrations), add a Web redirect URI, and set OUTLOOK_OAUTH_CLIENT_ID plus OUTLOOK_OAUTH_CLIENT_SECRET and OUTLOOK_OAUTH_REDIRECT_URI in .env. That's a one time setup only you can do, since it needs your own Microsoft account.">Connect</button>
+          <button class="connect-btn" data-provider="slack" data-name="Slack" data-note="Slack isn't connected yet, this button can't finish the OAuth flow on its own. To wire it up: create an app at api.slack.com/apps (From scratch), add a redirect URL under OAuth & Permissions, and set SLACK_OAUTH_CLIENT_ID plus SLACK_OAUTH_CLIENT_SECRET and SLACK_OAUTH_REDIRECT_URI in .env. That's a one time setup only you can do, since it needs your own Slack account and a workspace to install the app into.">Connect</button>
         </div>
 
         <div class="connect-card">
@@ -312,7 +321,7 @@
 
     const note = document.getElementById('connect-note');
 
-    // Gmail was the first connection wired to a real OAuth flow; Outlook,
+    // Gmail was the first connection wired to a real OAuth flow; Slack,
     // LinkedIn, and X use the same shape (see wireOAuthProvider below),
     // GitHub is different (a pasted token, not a redirect, see further
     // down). Reflect real connected/unconfigured status instead of a
@@ -364,7 +373,7 @@
       }
     });
 
-    // Outlook, LinkedIn, and X all follow the exact same connect/status/
+    // Slack, LinkedIn, and X all follow the exact same connect/status/
     // disconnect/callback shape server-side (oauth_connections.py), so one
     // function wires all three instead of repeating gmailBtn's logic
     // three times.
@@ -419,7 +428,7 @@
       refreshStatus();
     }
 
-    wireOAuthProvider('outlook', 'Outlook');
+    wireOAuthProvider('slack', 'Slack');
     wireOAuthProvider('linkedin', 'LinkedIn');
     wireOAuthProvider('x', 'X');
 
@@ -500,7 +509,7 @@
     });
 
     const params = new URLSearchParams(window.location.search);
-    const CONNECT_LABELS = { gmail: 'Gmail', outlook: 'Outlook', linkedin: 'LinkedIn', x: 'X' };
+    const CONNECT_LABELS = { gmail: 'Gmail', slack: 'Slack', linkedin: 'LinkedIn', x: 'X' };
     for (const [key, label] of Object.entries(CONNECT_LABELS)) {
       if (params.get(key) === 'connected') {
         note.textContent = `${label} connected.`;

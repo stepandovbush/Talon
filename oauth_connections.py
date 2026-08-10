@@ -1,17 +1,17 @@
-"""OAuth connections for Outlook, LinkedIn, and X.
+"""OAuth connections for Slack, LinkedIn, and X.
 
 Same single-user, local-file token pattern as google_auth.py -- one
 person's own accounts, no multi-user system. Each of these needs its own
-OAuth app registered on that platform's own developer portal (Azure
-Entra ID, LinkedIn Developers, X Developer Portal), which only the
-account owner can create, that's a one-time setup only the user can do
-themselves, same as Gmail. Until the matching CLIENT_ID/SECRET env vars
-are set, the Connect button just explains that instead of failing
-silently.
+OAuth app registered on that platform's own developer portal (Slack API,
+LinkedIn Developers, X Developer Portal), which only the account owner
+can create, that's a one-time setup only the user can do themselves, same
+as Gmail. Until the matching CLIENT_ID/SECRET env vars are set, the
+Connect button just explains that instead of failing silently.
 
 Generic across providers since the OAuth 2.0 authorization-code shape is
-identical for all three, only endpoints/scopes differ, and X additionally
-requires PKCE.
+identical for all three, only endpoints/scopes differ, X additionally
+requires PKCE, and Slack requests user-level scopes under a differently
+named query param and nests its token response under "authed_user".
 """
 
 import base64
@@ -26,16 +26,18 @@ import requests
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 PROVIDERS = {
-    "outlook": {
-        "auth_endpoint": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        "token_endpoint": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-        # Multi-tenant + personal accounts, delegated Mail.Read + offline
-        # access for a refresh token, User.Read for basic profile.
-        "scope": "offline_access Mail.Read User.Read",
-        "client_id_env": "OUTLOOK_OAUTH_CLIENT_ID",
-        "client_secret_env": "OUTLOOK_OAUTH_CLIENT_SECRET",
-        "redirect_env": "OUTLOOK_OAUTH_REDIRECT_URI",
-        "redirect_default": "http://localhost:8744/api/outlook/callback",
+    "slack": {
+        "auth_endpoint": "https://slack.com/oauth/v2/authorize",
+        "token_endpoint": "https://slack.com/api/oauth.v2.access",
+        # A user-level token (channels/DMs the connecting person can
+        # already see), not a bot installed into the workspace, so this
+        # goes in "user_scope" not "scope" -- see scope_param below.
+        "scope": "channels:history,channels:read,im:history,users:read",
+        "scope_param": "user_scope",
+        "client_id_env": "SLACK_OAUTH_CLIENT_ID",
+        "client_secret_env": "SLACK_OAUTH_CLIENT_SECRET",
+        "redirect_env": "SLACK_OAUTH_REDIRECT_URI",
+        "redirect_default": "http://localhost:8744/api/slack/callback",
         "pkce": False,
     },
     "linkedin": {
@@ -95,11 +97,9 @@ def build_auth_url(provider: str, state: str) -> tuple[str, str | None]:
         "client_id": os.environ[cfg["client_id_env"]],
         "redirect_uri": redirect_uri(provider),
         "response_type": "code",
-        "scope": cfg["scope"],
+        cfg.get("scope_param", "scope"): cfg["scope"],
         "state": state,
     }
-    if provider == "outlook":
-        params["response_mode"] = "query"
     if cfg["pkce"]:
         code_verifier, challenge = _new_pkce_pair()
         params["code_challenge"] = challenge
@@ -126,7 +126,19 @@ def exchange_code(provider: str, code: str, code_verifier: str | None) -> dict:
         data["client_secret"] = os.environ[cfg["client_secret_env"]]
     resp = requests.post(cfg["token_endpoint"], data=data, auth=auth, timeout=15)
     resp.raise_for_status()
-    return resp.json()
+    result = resp.json()
+
+    if provider == "slack":
+        # Slack always returns 200 even on failure, real success/failure is
+        # in the "ok" field, and a user-scope token comes back nested
+        # under "authed_user" rather than at the top level like every
+        # other provider here, flatten it so storage/refresh stays generic.
+        if not result.get("ok"):
+            raise RuntimeError(result.get("error", "Slack token exchange failed"))
+        authed_user = result.get("authed_user") or {}
+        result = {**result, **authed_user}
+
+    return result
 
 
 def _load(provider: str) -> dict | None:
@@ -165,7 +177,13 @@ def get_valid_access_token(provider: str) -> str | None:
     tokens = _load(provider)
     if tokens is None:
         return None
-    expires_at = tokens.get("obtained_at", 0) + tokens.get("expires_in", 0)
+    expires_in = tokens.get("expires_in")
+    # No expires_in at all (Slack's classic user tokens never expire)
+    # means there's nothing to check, not "expired 0 seconds after
+    # issuing" -- treat missing as valid indefinitely.
+    if not expires_in:
+        return tokens.get("access_token")
+    expires_at = tokens.get("obtained_at", 0) + expires_in
     if time.time() < expires_at - 60:
         return tokens.get("access_token")
 

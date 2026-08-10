@@ -595,20 +595,20 @@ def github_disconnect():
     return jsonify(ok=True)
 
 
-# Outlook, LinkedIn, and X all use the same OAuth 2.0 authorization-code
+# Slack, LinkedIn, and X all use the same OAuth 2.0 authorization-code
 # shape (oauth_connections.py), one small route set per provider so the
 # URLs stay predictable, but sharing all the actual logic.
 _oauth_pending: dict[str, dict] = {}
 
 _PROVIDER_UNCONFIGURED_NOTES = {
-    "outlook": (
-        "Outlook isn't connected yet, this button can't finish the OAuth flow "
-        "on its own. To wire it up: register an app at "
-        "portal.azure.com (Azure Entra ID > App registrations), add a Web "
-        "redirect URI, and set OUTLOOK_OAUTH_CLIENT_ID plus "
-        "OUTLOOK_OAUTH_CLIENT_SECRET and OUTLOOK_OAUTH_REDIRECT_URI in .env. "
-        "That's a one time setup only you can do, since it needs your own "
-        "Microsoft account."
+    "slack": (
+        "Slack isn't connected yet, this button can't finish the OAuth flow "
+        "on its own. To wire it up: create an app at api.slack.com/apps "
+        "(From scratch), add a redirect URL under OAuth & Permissions, and "
+        "set SLACK_OAUTH_CLIENT_ID plus SLACK_OAUTH_CLIENT_SECRET and "
+        "SLACK_OAUTH_REDIRECT_URI in .env. That's a one time setup only "
+        "you can do, since it needs your own Slack account and a "
+        "workspace to install the app into."
     ),
     "linkedin": (
         "LinkedIn isn't connected yet, this button can't finish the OAuth "
@@ -677,7 +677,7 @@ def _register_oauth_routes(provider: str) -> None:
         return jsonify(ok=True)
 
 
-for _provider in ("outlook", "linkedin", "x"):
+for _provider in ("slack", "linkedin", "x"):
     _register_oauth_routes(_provider)
 
 
