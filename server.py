@@ -274,16 +274,22 @@ def _run_talon_job(
         contacts = None
         known_site = resolved_domain if resolved_company else None
 
-        # A bare company name can be shared by genuinely unrelated
-        # companies (Coda the workspace vs Coda the payments platform,
-        # Render the cloud host vs Render Network, Nocturne the fashion
-        # brand vs a totally unrelated Nocturne crypto/AI/gaming company).
-        # Two stages: first spot whether the name plausibly covers more
-        # than one real business at all (generous, noisy directory results
-        # are enough for this), then confirm each one's actual site with a
-        # targeted search (strict, never guesses). Skip entirely if the
-        # user already resolved this (came back from the picker).
-        if company and not resolved_company:
+        # Confirm which specific company before researching at all, every
+        # fresh mention, not just when multiple are detected. A bare name
+        # can be shared by genuinely unrelated companies (Coda the
+        # workspace vs Coda the payments platform, Render the cloud host
+        # vs Render Network, Nocturne the fashion brand vs a totally
+        # unrelated Nocturne crypto/AI/gaming company), and even when it
+        # isn't, showing what Talon found before spending a full research
+        # pass means a wrong guess costs one click, not a wasted lookup.
+        # Skipped when the user already resolved this (came back from the
+        # picker) or when this is a follow-up about the same company
+        # already confirmed earlier in the conversation (context_company),
+        # not a fresh mention needing its own confirmation.
+        is_fresh_mention = company and not resolved_company and (
+            not context_company or company.strip().lower() != context_company.strip().lower()
+        )
+        if is_fresh_mention:
             candidate_raw = contact_finder.search_company_candidates(company, on_step=step)
             topics = llm.identify_candidate_topics(company, candidate_raw)
             candidates = []
@@ -296,10 +302,23 @@ def _run_talon_job(
                             "domain": urlparse(domain).netloc.replace("www.", ""),
                             "description": topic.get("description", ""),
                         })
-            if len(candidates) > 1:
-                step("Found more than one company with this name, asking which one")
-                _job_finish(job_id, {"kind": "disambiguate", "query": text, "name": company, "candidates": candidates})
-                return
+            if not candidates:
+                # Nothing distinct enough to disambiguate, the common
+                # case, one obvious company. Still confirm it rather than
+                # silently assuming the guess is right.
+                site = contact_finder.find_official_site(company, on_step=step)
+                if site:
+                    candidates.append({
+                        "name": company,
+                        "domain": urlparse(site).netloc.replace("www.", ""),
+                        "description": llm.describe_company_briefly(company, candidate_raw),
+                    })
+            step("Confirming which company before researching")
+            _job_finish(job_id, {
+                "kind": "disambiguate", "query": text, "name": company,
+                "candidates": candidates, "allow_other": True,
+            })
+            return
 
         if not recipient and company:
             contacts = contact_finder.find_contacts(company, on_step=step, known_site=known_site)

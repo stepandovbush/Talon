@@ -594,6 +594,37 @@
   .disambiguate-name { font-size: 13.5px; font-weight: 700; }
   .disambiguate-domain { font-size: 11px; color: var(--muted); }
   .disambiguate-desc { font-size: 12px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
+  .disambiguate-option.other {
+    border-style: dashed; color: var(--muted);
+    justify-content: center; gap: 8px;
+  }
+  .disambiguate-other-icon {
+    width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
+    border: 1px dashed var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 18px; font-weight: 600;
+  }
+  .disambiguate-other-form {
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; background: var(--bg);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .disambiguate-other-form input {
+    font-size: 13px; padding: 8px 11px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--panel);
+    color: var(--text); font-family: inherit; width: 100%;
+    box-sizing: border-box;
+  }
+  .disambiguate-other-form input:focus { outline: none; border-color: var(--text); }
+  .disambiguate-other-row { display: flex; gap: 8px; }
+  .disambiguate-other-row button {
+    font-size: 13px; font-weight: 500; padding: 8px 16px;
+    border-radius: 9px; border: 1px solid var(--border);
+    background: var(--accent); color: #fff; cursor: pointer; flex-shrink: 0;
+  }
+  .disambiguate-other-row button:hover { opacity: 0.85; }
+  .disambiguate-other-row button:disabled { opacity: 0.5; cursor: default; }
+  .disambiguate-other-hint { font-size: 11px; color: var(--muted); margin: 0; }
 
   .backend-banner {
     display: none;
@@ -1295,7 +1326,7 @@
       card.className = 'contact-card';
       const title = document.createElement('div');
       title.className = 'contact-card-title';
-      title.textContent = `A few companies go by "${result.name}", which one?`;
+      title.textContent = `What company called "${result.name}" are you looking for?`;
       card.appendChild(title);
 
       const list = document.createElement('div');
@@ -1341,12 +1372,80 @@
         btn.addEventListener('click', () => chooseDisambiguationCandidate(result.query, c));
         list.appendChild(btn);
       });
+
+      // Always offer a manual escape hatch, not just when nothing was
+      // found -- a same-named company Talon's search never surfaced at
+      // all (too small, too new, no real web presence) still needs a way
+      // in, so the user can hand it the name and site directly instead of
+      // being stuck picking from a list that doesn't have it.
+      if (result.allow_other !== false) {
+        const otherBtn = document.createElement('button');
+        otherBtn.type = 'button';
+        otherBtn.className = 'disambiguate-option other';
+        const icon = document.createElement('span');
+        icon.className = 'disambiguate-other-icon';
+        icon.textContent = '+';
+        otherBtn.appendChild(icon);
+        const otherLabel = document.createElement('span');
+        otherLabel.textContent = "Other, I'll specify the company";
+        otherBtn.appendChild(otherLabel);
+        otherBtn.addEventListener('click', () => {
+          otherBtn.replaceWith(renderDisambiguateOtherForm(result.query));
+        });
+        list.appendChild(otherBtn);
+      }
+
       card.appendChild(list);
       return card;
     }
 
-    async function chooseDisambiguationCandidate(query, candidate) {
-      const chosenText = `${candidate.name} (${candidate.domain})`;
+    function renderDisambiguateOtherForm(query) {
+      const wrap = document.createElement('div');
+      wrap.className = 'disambiguate-other-form';
+
+      const hint = document.createElement('p');
+      hint.className = 'disambiguate-other-hint';
+      hint.textContent = "Company name, and its website if you know it (optional, helps Talon find the right one).";
+      wrap.appendChild(hint);
+
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.placeholder = 'Company name';
+      wrap.appendChild(nameInput);
+
+      const siteInput = document.createElement('input');
+      siteInput.type = 'text';
+      siteInput.placeholder = 'Website (optional, e.g. acme.com)';
+      wrap.appendChild(siteInput);
+
+      const row = document.createElement('div');
+      row.className = 'disambiguate-other-row';
+      const submitBtn = document.createElement('button');
+      submitBtn.type = 'button';
+      submitBtn.textContent = 'Search';
+      row.appendChild(submitBtn);
+      wrap.appendChild(row);
+
+      submitBtn.addEventListener('click', () => {
+        const name = nameInput.value.trim();
+        if (!name) {
+          nameInput.focus();
+          return;
+        }
+        const site = siteInput.value.trim();
+        submitBtn.disabled = true;
+        chooseDisambiguationCandidate(query, { name, domain: site || null }, wrap);
+      });
+      nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitBtn.click(); });
+      siteInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitBtn.click(); });
+
+      setTimeout(() => nameInput.focus(), 0);
+      return wrap;
+    }
+
+    async function chooseDisambiguationCandidate(query, candidate, formEl) {
+      const chosenText = candidate.domain ? `${candidate.name} (${candidate.domain})` : candidate.name;
+      if (formEl) formEl.remove();
       addBubble('user', chosenText);
       appendTurn({ role: 'user', text: chosenText });
       const bubble = createPendingAgentBubble();
@@ -1354,7 +1453,7 @@
         const startRes = await fetch(`${TALON_API}/api/talon/start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: query, resolved_company: candidate.name, resolved_domain: candidate.domain }),
+          body: JSON.stringify({ text: query, resolved_company: candidate.name, resolved_domain: candidate.domain || '' }),
         });
         const startData = await startRes.json();
         if (!startData.job_id) throw new Error(startData.error || 'failed to start');

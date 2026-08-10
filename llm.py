@@ -297,6 +297,25 @@ def rank_contact_routes(
     }))
 
 
+def describe_company_briefly(name: str, raw_results: list) -> str:
+    """One honest sentence on what a company does, grounded only in
+    material already gathered (no extra search), for the confirmation
+    picker's single-candidate case: nothing distinct enough to disambiguate
+    was found, but the user still gets to see what Talon thinks this
+    company is before it starts researching, and correct it if wrong."""
+    system = (
+        f'You are Talon. Write one honest, factual sentence on what "{name}" '
+        "does, based only on the raw web search material given. If the "
+        "material doesn't clearly say, write a short neutral sentence "
+        "rather than guessing at specifics not there. Write in plain "
+        "active voice, using only commas and periods for punctuation. "
+        "Never use an em dash or en dash. "
+        'Respond as JSON: {"description": string}.'
+    )
+    result = _ask_json(system, json.dumps({"name": name, "results": raw_results}))
+    return result.get("description", "")
+
+
 def identify_candidate_topics(name: str, raw_results: list) -> list:
     """Stage one of disambiguation: spot whether the name given could refer
     to more than one distinct, unrelated real company (not the same
