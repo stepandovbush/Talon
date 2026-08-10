@@ -144,6 +144,41 @@
     min-height: 16px;
     text-align: center;
   }
+
+  .github-panel {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    padding: 12px 14px;
+    margin-top: -2px;
+  }
+  .github-panel p { font-size: 12.5px; color: var(--muted); margin: 0 0 10px; line-height: 1.5; }
+  .github-panel a { color: var(--text); font-weight: 600; }
+  .github-panel-row { display: flex; gap: 8px; }
+  .github-panel-row input {
+    flex: 1;
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    font-family: inherit;
+  }
+  .github-panel-row input:focus { outline: none; border-color: var(--text); }
+  .github-panel-row button {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--text);
+    color: #fff;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .github-panel-row button:hover { opacity: 0.85; }
+  .github-panel-row button:disabled { opacity: 0.5; cursor: default; }
 </style>
 </head>
 <body>
@@ -155,11 +190,11 @@
     <a class="rail-btn" href="cases.html" data-tip="Cases">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
     </a>
-    <a class="rail-btn" href="schedule.html" data-tip="Schedule">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-    </a>
     <a class="rail-btn" href="report.html" data-tip="Report">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+    </a>
+    <a class="rail-btn" href="map.html" data-tip="Map">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 4v16"/><path d="M15 6v16"/></svg>
     </a>
     <div class="rail-spacer"></div>
     <a class="rail-btn active" href="connect.html" data-tip="Connect">
@@ -194,7 +229,7 @@
             <div class="connect-name">Gmail</div>
             <div class="connect-status">Not connected</div>
           </div>
-          <button class="connect-btn" data-name="Gmail" data-note="Gmail isn't connected yet, this button can't finish the OAuth flow on its own. To wire it up: create a project at console.cloud.google.com, enable the Gmail API, add an OAuth client ID (type: Web application), and set GOOGLE_OAUTH_CLIENT_ID plus the redirect URL in .env. That's a one time setup only you can do, since it needs your own Google account. Talon already sends through the Caspian email channel without this, this step is only for reading your personal Gmail inbox for context.">Connect</button>
+          <button class="connect-btn" data-provider="google" data-name="Gmail" data-note="Gmail isn't connected yet, this button can't finish the OAuth flow on its own. To wire it up: create a project at console.cloud.google.com, enable the Gmail API, add an OAuth client ID (type: Web application), and set GOOGLE_OAUTH_CLIENT_ID plus the redirect URL in .env. That's a one time setup only you can do, since it needs your own Google account. Talon already sends through the Caspian email channel without this, this step is only for reading your personal Gmail inbox for context.">Connect</button>
         </div>
 
         <div class="connect-card">
@@ -205,7 +240,7 @@
             <div class="connect-name">Outlook / Mail</div>
             <div class="connect-status">Not connected</div>
           </div>
-          <button class="connect-btn" data-name="Outlook / Mail" data-note="Connecting Outlook needs a Microsoft OAuth Client ID from your own Azure app registration. Once that's granted, Talon can read your inbox for context and send and follow up on your behalf, not just draft.">Connect</button>
+          <button class="connect-btn" data-provider="outlook" data-name="Outlook" data-note="Outlook isn't connected yet, this button can't finish the OAuth flow on its own. To wire it up: register an app at portal.azure.com (Azure Entra ID > App registrations), add a Web redirect URI, and set OUTLOOK_OAUTH_CLIENT_ID plus OUTLOOK_OAUTH_CLIENT_SECRET and OUTLOOK_OAUTH_REDIRECT_URI in .env. That's a one time setup only you can do, since it needs your own Microsoft account.">Connect</button>
         </div>
 
         <div class="connect-card">
@@ -216,7 +251,14 @@
             <div class="connect-name">GitHub</div>
             <div class="connect-status">Not connected</div>
           </div>
-          <button class="connect-btn" data-name="GitHub" data-note="Connecting GitHub uses their public API. Once you generate a token for it, Talon can read your public profile and activity for context, useful for finding a developer's self listed contact info.">Connect</button>
+          <button class="connect-btn" data-provider="github" data-name="GitHub">Connect</button>
+        </div>
+        <div class="github-panel" id="github-panel" style="display:none;">
+          <p>Paste a personal access token, no scopes needed for public profile data. <a href="https://github.com/settings/tokens/new?description=Talon&scopes=" target="_blank" rel="noopener">Generate one on GitHub →</a></p>
+          <div class="github-panel-row">
+            <input type="password" id="github-token-input" placeholder="ghp_..." autocomplete="off">
+            <button type="button" id="github-token-save">Save</button>
+          </div>
         </div>
 
         <div class="connect-card">
@@ -227,7 +269,7 @@
             <div class="connect-name">LinkedIn</div>
             <div class="connect-status">Not connected</div>
           </div>
-          <button class="connect-btn" data-name="LinkedIn" data-note="Connecting LinkedIn needs a LinkedIn Developer app with API access, set up under your own account. Once that's in place, Talon can read your network for context and reach out through LinkedIn on your behalf.">Connect</button>
+          <button class="connect-btn" data-provider="linkedin" data-name="LinkedIn" data-note="LinkedIn isn't connected yet, this button can't finish the OAuth flow on its own. To wire it up: create an app at developer.linkedin.com with the &quot;Sign In with LinkedIn using OpenID Connect&quot; product added, add a redirect URL, and set LINKEDIN_OAUTH_CLIENT_ID plus LINKEDIN_OAUTH_CLIENT_SECRET and LINKEDIN_OAUTH_REDIRECT_URI in .env. That's a one time setup only you can do. Note LinkedIn only grants basic profile access to a standard app, reading your network needs LinkedIn's own partner approval.">Connect</button>
         </div>
 
         <div class="connect-card">
@@ -238,7 +280,7 @@
             <div class="connect-name">X</div>
             <div class="connect-status">Not connected</div>
           </div>
-          <button class="connect-btn" data-name="X" data-note="Connecting X needs your own X Developer API keys. Once you have them, Talon can read public profiles for context and message people through X directly, since X is a Caspian channel already.">Connect</button>
+          <button class="connect-btn" data-provider="x" data-name="X" data-note="X isn't connected yet, this button can't finish the OAuth flow on its own. To wire it up: create a project and app at developer.x.com, enable OAuth 2.0 with a Web app redirect URI, and set X_OAUTH_CLIENT_ID plus X_OAUTH_CLIENT_SECRET and X_OAUTH_REDIRECT_URI in .env. That's a one time setup only you can do, since it needs your own X developer account.">Connect</button>
         </div>
       </div>
 
@@ -260,12 +302,217 @@
       window.location.href = 'index.html';
     });
 
+    // Same backend-origin detection as home.html: only a local static
+    // preview (e.g. Live Server on :5500) needs the API pointed at :8744
+    // explicitly, everywhere else (served by server.py directly, including
+    // a real deployment) a relative path is same-origin and correct.
+    const isLocalStaticPreview = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      && location.port && location.port !== '8744';
+    const TALON_API = isLocalStaticPreview ? 'http://localhost:8744' : '';
+
     const note = document.getElementById('connect-note');
-    document.querySelectorAll('.connect-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        note.textContent = btn.dataset.note;
-      });
+
+    // Gmail was the first connection wired to a real OAuth flow; Outlook,
+    // LinkedIn, and X use the same shape (see wireOAuthProvider below),
+    // GitHub is different (a pasted token, not a redirect, see further
+    // down). Reflect real connected/unconfigured status instead of a
+    // static "Not connected".
+    const gmailBtn = document.querySelector('.connect-btn[data-name="Gmail"]');
+    const gmailStatus = gmailBtn.closest('.connect-card').querySelector('.connect-status');
+
+    async function refreshGmailStatus() {
+      try {
+        const res = await fetch(`${TALON_API}/api/google/status`);
+        const data = await res.json();
+        if (data.connected) {
+          gmailStatus.textContent = 'Connected';
+          gmailBtn.textContent = 'Disconnect';
+        } else if (data.configured) {
+          gmailStatus.textContent = 'Not connected';
+          gmailBtn.textContent = 'Connect';
+        } else {
+          gmailStatus.textContent = 'Needs setup';
+          gmailBtn.textContent = 'Connect';
+        }
+        return data;
+      } catch (err) {
+        gmailStatus.textContent = 'Not connected';
+        return null;
+      }
+    }
+
+    gmailBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (gmailBtn.textContent === 'Disconnect') {
+        gmailBtn.disabled = true;
+        try {
+          await fetch(`${TALON_API}/api/google/disconnect`, { method: 'POST' });
+          note.textContent = 'Gmail disconnected.';
+        } catch (err) {
+          note.textContent = `Couldn't reach Talon's backend (${err.message}).`;
+        }
+        gmailBtn.disabled = false;
+        refreshGmailStatus();
+        return;
+      }
+
+      const data = await refreshGmailStatus();
+      if (data && data.configured) {
+        window.location.href = `${TALON_API}/api/google/connect`;
+      } else {
+        note.textContent = gmailBtn.dataset.note;
+      }
     });
+
+    // Outlook, LinkedIn, and X all follow the exact same connect/status/
+    // disconnect/callback shape server-side (oauth_connections.py), so one
+    // function wires all three instead of repeating gmailBtn's logic
+    // three times.
+    function wireOAuthProvider(providerKey, displayName) {
+      const btn = document.querySelector(`.connect-btn[data-provider="${providerKey}"]`);
+      const statusEl = btn.closest('.connect-card').querySelector('.connect-status');
+
+      async function refreshStatus() {
+        try {
+          const res = await fetch(`${TALON_API}/api/${providerKey}/status`);
+          const data = await res.json();
+          if (data.connected) {
+            statusEl.textContent = 'Connected';
+            btn.textContent = 'Disconnect';
+          } else if (data.configured) {
+            statusEl.textContent = 'Not connected';
+            btn.textContent = 'Connect';
+          } else {
+            statusEl.textContent = 'Needs setup';
+            btn.textContent = 'Connect';
+          }
+          return data;
+        } catch (err) {
+          statusEl.textContent = 'Not connected';
+          return null;
+        }
+      }
+
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (btn.textContent === 'Disconnect') {
+          btn.disabled = true;
+          try {
+            await fetch(`${TALON_API}/api/${providerKey}/disconnect`, { method: 'POST' });
+            note.textContent = `${displayName} disconnected.`;
+          } catch (err) {
+            note.textContent = `Couldn't reach Talon's backend (${err.message}).`;
+          }
+          btn.disabled = false;
+          refreshStatus();
+          return;
+        }
+
+        const data = await refreshStatus();
+        if (data && data.configured) {
+          window.location.href = `${TALON_API}/api/${providerKey}/connect`;
+        } else {
+          note.textContent = btn.dataset.note;
+        }
+      });
+
+      refreshStatus();
+    }
+
+    wireOAuthProvider('outlook', 'Outlook');
+    wireOAuthProvider('linkedin', 'LinkedIn');
+    wireOAuthProvider('x', 'X');
+
+    // GitHub is a pasted personal access token, not an OAuth redirect --
+    // no app registration needed, so "Connect" just reveals the input
+    // panel instead of navigating away.
+    const githubBtn = document.querySelector('.connect-btn[data-provider="github"]');
+    const githubStatus = githubBtn.closest('.connect-card').querySelector('.connect-status');
+    const githubPanel = document.getElementById('github-panel');
+    const githubInput = document.getElementById('github-token-input');
+    const githubSave = document.getElementById('github-token-save');
+
+    async function refreshGithubStatus() {
+      try {
+        const res = await fetch(`${TALON_API}/api/github/status`);
+        const data = await res.json();
+        if (data.connected) {
+          githubStatus.textContent = `Connected as ${data.username || 'unknown'}`;
+          githubBtn.textContent = 'Disconnect';
+        } else {
+          githubStatus.textContent = 'Not connected';
+          githubBtn.textContent = 'Connect';
+        }
+        return data;
+      } catch (err) {
+        githubStatus.textContent = 'Not connected';
+        return null;
+      }
+    }
+
+    githubBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (githubBtn.textContent === 'Disconnect') {
+        githubBtn.disabled = true;
+        try {
+          await fetch(`${TALON_API}/api/github/disconnect`, { method: 'POST' });
+          note.textContent = 'GitHub disconnected.';
+        } catch (err) {
+          note.textContent = `Couldn't reach Talon's backend (${err.message}).`;
+        }
+        githubBtn.disabled = false;
+        githubPanel.style.display = 'none';
+        refreshGithubStatus();
+        return;
+      }
+      githubPanel.style.display = githubPanel.style.display === 'none' ? 'block' : 'none';
+      if (githubPanel.style.display === 'block') githubInput.focus();
+    });
+
+    githubSave.addEventListener('click', async () => {
+      const token = githubInput.value.trim();
+      if (!token) {
+        note.textContent = 'Paste a token first.';
+        return;
+      }
+      githubSave.disabled = true;
+      githubSave.textContent = 'Checking...';
+      try {
+        const res = await fetch(`${TALON_API}/api/github/connect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          note.textContent = `GitHub connected as ${data.username}.`;
+          githubInput.value = '';
+          githubPanel.style.display = 'none';
+          refreshGithubStatus();
+        } else {
+          note.textContent = data.error || 'Something went wrong, try again.';
+        }
+      } catch (err) {
+        note.textContent = `Couldn't reach Talon's backend (${err.message}).`;
+      }
+      githubSave.disabled = false;
+      githubSave.textContent = 'Save';
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    const CONNECT_LABELS = { gmail: 'Gmail', outlook: 'Outlook', linkedin: 'LinkedIn', x: 'X' };
+    for (const [key, label] of Object.entries(CONNECT_LABELS)) {
+      if (params.get(key) === 'connected') {
+        note.textContent = `${label} connected.`;
+        window.history.replaceState({}, '', 'connect.html');
+      } else if (params.get(key) === 'error') {
+        note.textContent = `${label} connection failed (${params.get('reason') || 'unknown error'}). Check the matching CLIENT_ID/SECRET/REDIRECT_URI in .env.`;
+        window.history.replaceState({}, '', 'connect.html');
+      }
+    }
+
+    refreshGmailStatus();
+    refreshGithubStatus();
   </script>
 </body>
 </html>

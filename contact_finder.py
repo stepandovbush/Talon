@@ -22,6 +22,19 @@ TIMEOUT = 8
 EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 UNICODE_ESCAPE_RE = re.compile(r"\\u([0-9a-fA-F]{4})")
 
+# Requires a separator between every digit group (space, dash, dot, or
+# parens), never a bare run of digits -- that's what keeps this from
+# matching zip+4 codes, dates, prices, or tracking IDs, which are the real
+# false-positive risk with a naive phone regex over arbitrary page text.
+PHONE_RE = re.compile(
+    r"(?<!\d)(?:\+\d{1,3}[\s.-]?)?\(?\d{2,4}\)?[\s.-]\d{3,4}[\s.-]\d{2,4}(?:[\s.-]\d{2,4})?(?!\d)"
+)
+# A phone-shaped number alone isn't enough -- order IDs and SKUs match the
+# same shape. Only trust a freeform match (not a tel: link, those are
+# unambiguous) if a phone-related word sits just before it.
+PHONE_CONTEXT_RE = re.compile(r"phone|call|tel\b|fax|contact|reach|hotline", re.IGNORECASE)
+PHONE_CONTEXT_WINDOW = 35
+
 SOCIAL_DOMAINS = {
     "twitter.com": "twitter",
     "x.com": "twitter",
@@ -143,7 +156,23 @@ def find_official_site(company: str, on_step=None) -> str | None:
     return site
 
 
-def extract_emails(html: str) -> set[str]:
+def _registrable_domain(netloc: str) -> str:
+    """Good enough for comparing against a company's own site: strips a
+    leading www. and keeps the rest, so mail.coda.io and coda.io both
+    resolve to "coda.io" but grammarly.com does not."""
+    netloc = netloc.lower()
+    if netloc.startswith("www."):
+        netloc = netloc[4:]
+    parts = netloc.split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else netloc
+
+
+def extract_emails(html: str, site_domain: str | None = None) -> set[str]:
+    """Emails found on a page. When site_domain is given (the company's own
+    site being crawled), emails on an unrelated domain are dropped -- a
+    partners/press page often names other companies (integration partners,
+    press mentions) whose own contact emails would otherwise get mistaken
+    for this company's."""
     if not html:
         return set()
     # Next.js/etc. often embed page data as JSON with >-style escapes;
@@ -155,6 +184,7 @@ def extract_emails(html: str) -> set[str]:
         href = a["href"]
         if href.lower().startswith("mailto:"):
             emails.add(href[7:].split("?")[0])
+    site_root = _registrable_domain(site_domain) if site_domain else None
     cleaned = set()
     for email in emails:
         email = email.strip(".,;:()<>\"'")
@@ -171,6 +201,8 @@ def extract_emails(html: str) -> set[str]:
             continue
         local_part = lower.split("@", 1)[0]
         if JUNK_LOCAL_PART_RE.match(local_part):
+            continue
+        if site_root and _registrable_domain(domain) != site_root:
             continue
         cleaned.add(email)
     return cleaned
@@ -217,6 +249,36 @@ def extract_socials(html: str, base_url: str) -> dict[str, str]:
     return socials
 
 
+def extract_phone_numbers(html: str) -> set[str]:
+    """Phone numbers found on a page: tel: links (unambiguous) plus
+    freeform text, but only text matches sitting right after a phone-related
+    word (Phone:, Call us, Fax, etc.), since a bare digit pattern alone is
+    indistinguishable from an order number or SKU."""
+    if not html:
+        return set()
+    soup = BeautifulSoup(html, "html.parser")
+    numbers: set[str] = set()
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if href.lower().startswith("tel:"):
+            raw = href[4:].split("?")[0].strip()
+            if raw:
+                numbers.add(raw)
+
+    text = soup.get_text(" ")
+    for m in PHONE_RE.finditer(text):
+        start = max(0, m.start() - PHONE_CONTEXT_WINDOW)
+        if PHONE_CONTEXT_RE.search(text[start:m.start()]):
+            numbers.add(m.group().strip())
+
+    cleaned = set()
+    for number in numbers:
+        digit_count = sum(c.isdigit() for c in number)
+        if 7 <= digit_count <= 15:
+            cleaned.add(number)
+    return cleaned
+
+
 def classify_email(email: str) -> str:
     lower = email.lower()
     if any(k in lower for k in PARTNERSHIP_KEYWORDS):
@@ -230,11 +292,19 @@ def classify_email(email: str) -> str:
     return "other"
 
 
+# Priority order for picking a single "here's their support page directly"
+# fallback link, not the order pages are crawled in -- a dedicated
+# contact/support page beats stumbling onto the homepage.
+SUPPORT_PATH_PRIORITY = ["/contact", "/support", "/help", "/contact-us"]
+
+
 def crawl_site(base_url: str, on_step=None) -> dict:
     parsed = urlparse(base_url)
     root = f"{parsed.scheme}://{parsed.netloc}"
+    site_domain = parsed.netloc
     emails_by_category: dict[str, set[str]] = {}
     socials: dict[str, str] = {}
+    phones: set[str] = set()
     pages_checked = []
 
     for path in CONTACT_PATHS:
@@ -245,26 +315,43 @@ def crawl_site(base_url: str, on_step=None) -> dict:
         if not html:
             continue
         pages_checked.append(page_url)
-        found_emails = extract_emails(html)
+        found_emails = extract_emails(html, site_domain)
         found_socials = extract_socials(html, page_url)
-        if on_step and (found_emails or found_socials):
+        found_phones = extract_phone_numbers(html)
+        if on_step and (found_emails or found_socials or found_phones):
             bits = []
             if found_emails:
                 bits.append(f"{len(found_emails)} email(s)")
             if found_socials:
                 bits.append(f"{len(found_socials)} social link(s)")
+            if found_phones:
+                bits.append(f"{len(found_phones)} phone number(s)")
             on_step(f"Found {' and '.join(bits)} on {page_url}")
         for email in found_emails:
             category = classify_email(email)
             emails_by_category.setdefault(category, set()).add(email)
         for name, link in found_socials.items():
             socials.setdefault(name, link)
+        phones.update(found_phones)
+
+    pages_checked_set = set(pages_checked)
+    support_page = None
+    for path in SUPPORT_PATH_PRIORITY:
+        candidate = root + path
+        if candidate in pages_checked_set:
+            support_page = candidate
+            break
 
     return {
         "site": root,
         "emails": {k: sorted(v) for k, v in emails_by_category.items()},
         "socials": socials,
+        # Large companies list dozens of regional support lines (HubSpot's
+        # own contact page has 50+); cap what's carried forward so it stays
+        # a usable list, not a wall of numbers.
+        "phones": sorted(phones)[:5],
         "pages_checked": pages_checked,
+        "support_page": support_page,
     }
 
 
@@ -294,7 +381,7 @@ def find_social_via_search(company: str, on_step=None) -> dict[str, str]:
     return socials
 
 
-def find_contacts(company_or_query: str, on_step=None) -> dict:
+def find_contacts(company_or_query: str, on_step=None, known_site: str | None = None) -> dict:
     """Look up everything findable for a company: contact emails by purpose
     (partnership, general/support, press, careers) and social profiles.
 
@@ -303,24 +390,37 @@ def find_contacts(company_or_query: str, on_step=None) -> dict:
     guessing at a search engine (could be an unrelated or impersonator
     account with a similar name, e.g. "brandname.officially" copycats).
 
+    Pass known_site when the exact site is already confirmed (e.g. the user
+    picked a specific company off a disambiguation list) to skip the guess
+    entirely and search the right domain, not just a same-named one.
+
     Pass on_step(message: str) to get a live, real trace of what's actually
     happening (which page is being fetched, which query is being run) instead
     of a fake progress bar."""
-    site = find_official_site(company_or_query, on_step=on_step)
+    if known_site:
+        site = known_site if known_site.startswith("http") else f"https://{known_site}"
+        if on_step:
+            on_step(f"Using confirmed site: {site}")
+    else:
+        site = find_official_site(company_or_query, on_step=on_step)
     result = {
         "query": company_or_query,
         "site": site,
         "emails": {},
+        "phones": [],
         "socials": {},
         "socials_unverified": {},
         "pages_checked": [],
+        "support_page": None,
     }
 
     if site:
         crawled = crawl_site(site, on_step=on_step)
         result["emails"] = crawled["emails"]
+        result["phones"] = crawled["phones"]
         result["socials"] = crawled["socials"]
         result["pages_checked"] = crawled["pages_checked"]
+        result["support_page"] = crawled["support_page"]
 
     for name, link in find_social_via_search(company_or_query, on_step=on_step).items():
         if name not in result["socials"]:
@@ -329,7 +429,10 @@ def find_contacts(company_or_query: str, on_step=None) -> dict:
     if on_step:
         total_emails = sum(len(v) for v in result["emails"].values())
         total_socials = len(result["socials"]) + len(result["socials_unverified"])
-        on_step(f"Done: found {total_emails} email(s) and {total_socials} social link(s)")
+        bits = [f"{total_emails} email(s)", f"{total_socials} social link(s)"]
+        if result["phones"]:
+            bits.append(f"{len(result['phones'])} phone number(s)")
+        on_step(f"Done: found {' and '.join(bits)}")
 
     return result
 
@@ -398,6 +501,96 @@ def find_intent_signals(company: str, on_step=None) -> dict:
         "funding_snippets": _search_snippets(f"{company} funding round raises OR raised", max_results=4),
         "launch_snippets": _search_snippets(f"{company} launches OR announces new", max_results=4),
     }
+
+
+APPLICATION_ROUTE_QUERIES = {
+    "partnership": "{company} partner program",
+    "general": "{company} support help center contact",
+    "careers": "{company} careers open positions",
+    "press": "{company} press kit media inquiries",
+}
+
+
+def search_company_candidates(name: str, on_step=None) -> list[dict]:
+    """Raw search results for the bare company name, so
+    llm.identify_candidate_topics can tell whether it's genuinely shared by
+    more than one distinct, unrelated real company (not just one company
+    covered across many pages). Not used for anything else -- once a
+    specific company is confirmed, the rest of the pipeline does its own
+    targeted searches.
+
+    Runs three differently-phrased queries and merges the results (deduped
+    by URL), not just one: a single 6-result search is a coin flip on
+    whether a second, less-SEO-dominant company actually shows up on a
+    given call. Seen directly in testing: "Render" (the cloud host) vs
+    "Render Network" needed a second phrasing to catch both, and "Nocturne"
+    (at least four distinct real companies: a fashion brand, a defunct
+    Ethereum privacy protocol, a Berlin AI startup, and a mobile game
+    studio) needed a third ("startup") before any of the non-fashion ones
+    surfaced at all."""
+    if on_step:
+        on_step(f'Checking whether "{name}" could mean more than one company')
+    seen_urls = set()
+    combined = []
+    for query in (f"{name} company", f"{name} official site", f"{name} startup"):
+        for r in search_web(query, max_results=8):
+            url = r.get("href", "")
+            if url and url in seen_urls:
+                continue
+            if url:
+                seen_urls.add(url)
+            if r.get("title") or r.get("body"):
+                combined.append({"title": r.get("title", ""), "body": r.get("body", ""), "url": url})
+    return combined
+
+
+def confirm_candidate_domain(name: str, hint: str, on_step=None) -> str | None:
+    """Stage two of disambiguation: given one distinct entity's
+    distinguishing hint (e.g. "Berlin AI startup", "mobile game studio"),
+    search specifically for that entity's own site rather than the bare
+    name, which the SEO-dominant same-named company would otherwise crowd
+    out. Only accepts a result whose domain actually contains the base
+    name, own site or not, this rejects an unrelated top hit a noisy
+    hint-based query can surface, e.g. a government visa portal or a
+    modding site with no real connection to any "Nocturne".
+
+    Returns None (never guesses) if nothing meeting that bar turns up,
+    which is the correct outcome for a stage-one hint that was noise, not a
+    real distinct company."""
+    slug = _slugify(name)
+    if not slug:
+        return None
+    if on_step:
+        on_step(f'Looking for "{name}" ({hint})\'s own site')
+    for query in (f"{name} {hint} official website", f"{name} {hint}"):
+        for r in search_web(query, max_results=6):
+            url = _result_url(r)
+            if not url or not _looks_official(url):
+                continue
+            parsed = urlparse(url)
+            netloc = parsed.netloc.lower().replace("www.", "")
+            if slug in netloc.replace(".", "") and parsed.path in ("", "/"):
+                return url
+    return None
+
+
+def find_application_routes(company: str, want: str, on_step=None) -> list[dict]:
+    """Search for a formal application/portal/ticket-submission route
+    relevant to the specific kind of contact being sought: a partner program
+    for partnership asks, a help center/ticket system for support asks, a
+    careers page for hiring asks. Raw results (title/body/url) only -- see
+    llm.rank_contact_routes for the grounded read on whether one actually
+    exists, and for filtering out results that turn out to be about an
+    unrelated, similarly-named company."""
+    query = APPLICATION_ROUTE_QUERIES.get(want, "{company} contact us").format(company=company)
+    if on_step:
+        on_step(f"Checking if {company} has a formal application or ticket route")
+    results = search_web(query, max_results=4)
+    return [
+        {"title": r.get("title", ""), "body": r.get("body", ""), "url": r.get("href", "")}
+        for r in results
+        if r.get("title") or r.get("body")
+    ]
 
 
 def search_similar_companies(company: str, on_step=None) -> list[dict]:

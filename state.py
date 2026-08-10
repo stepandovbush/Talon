@@ -29,6 +29,7 @@ def create_case(
     opening_email: str,
     channel: str = "web",
     subject: str | None = None,
+    company: str | None = None,
 ) -> None:
     now = time.time()
     with _lock:
@@ -37,6 +38,7 @@ def create_case(
             "telegram_conversation_id": telegram_conversation_id,
             "recipient": recipient,
             "subject": subject,
+            "company": company,
             "channel": channel,
             "status": "awaiting_reply",
             "history": [{"role": "talon", "text": opening_email, "at": now}],

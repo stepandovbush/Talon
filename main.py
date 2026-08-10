@@ -85,6 +85,7 @@ def handle_telegram(message):
         opening_email=draft["email_text"],
         channel="telegram",
         subject=draft.get("subject"),
+        company=company,
     )
 
 

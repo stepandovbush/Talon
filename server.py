@@ -4,15 +4,19 @@ import sqlite3
 import threading
 import time
 import uuid
+from urllib.parse import urlparse
 
 from caspian_sdk import CommClient
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, redirect, request, send_from_directory
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import agent
 import contact_finder
+import github_auth
+import google_auth
 import llm
+import oauth_connections
 import reports
 import state
 
@@ -201,6 +205,27 @@ def _category_found(contacts: dict, want: str) -> bool:
     return True  # "any" (or unrecognized) is satisfied by whatever was found
 
 
+def _ensure_support_fallback_route(contacts: dict, routes_list: list) -> list:
+    """When there's no partnership or general email at all, guarantee a
+    direct link to their support/contact page shows up as a route, rather
+    than leaving it to the LLM's discretion whether to surface it. This is
+    a verified URL (crawl_site already got a real 200 from it), not a
+    search guess, so it's safe to add deterministically."""
+    has_direct_email = bool(contacts.get("emails", {}).get("partnership") or contacts.get("emails", {}).get("general"))
+    support_page = contacts.get("support_page")
+    if has_direct_email or not support_page:
+        return routes_list
+    if any(support_page in (r.get("detail") or "") for r in routes_list):
+        return routes_list
+    return routes_list + [{
+        "type": "application",
+        "label": "Their support/contact page",
+        "detail": f"No partnership or general email was found, but {support_page} is a confirmed page on their own site.",
+        "confidence": "medium",
+        "why": "No direct email to use, this is their own site's contact or ticket-submission route instead.",
+    }]
+
+
 def _research_similar_companies(company: str, step) -> list:
     """Proactively look into 2 competitors/alternatives too, not just the
     company that was asked about -- someone comparing partnership or support
@@ -212,7 +237,7 @@ def _research_similar_companies(company: str, step) -> list:
     for peer in names[:2]:
         step(f"Researching {peer} as a comparable option")
         peer_contacts = contact_finder.find_contacts(peer, on_step=step)
-        if peer_contacts["emails"] or peer_contacts["socials"] or peer_contacts["socials_unverified"]:
+        if peer_contacts["emails"] or peer_contacts["socials"] or peer_contacts["socials_unverified"] or peer_contacts["phones"]:
             peers.append({"name": peer, "contacts": peer_contacts})
     return peers
 
@@ -231,25 +256,59 @@ def _report_title(company: str, want: str) -> str:
     return f"{company} — {WANT_LABELS.get(want, 'Company')} Research"
 
 
-def _run_talon_job(job_id: str, text: str) -> None:
+def _run_talon_job(
+    job_id: str,
+    text: str,
+    context_company: str | None = None,
+    resolved_company: str | None = None,
+    resolved_domain: str | None = None,
+) -> None:
     step = lambda message: _job_step(job_id, message)  # noqa: E731
     try:
         step("Reading your message")
-        info = llm.classify_request(text)
-        company = info.get("company")
+        info = llm.classify_request(text, context_company=context_company)
+        company = resolved_company or info.get("company")
         recipient = info.get("recipient")
         want = info.get("want", "any")
         contacts = None
+        known_site = resolved_domain if resolved_company else None
+
+        # A bare company name can be shared by genuinely unrelated
+        # companies (Coda the workspace vs Coda the payments platform,
+        # Render the cloud host vs Render Network, Nocturne the fashion
+        # brand vs a totally unrelated Nocturne crypto/AI/gaming company).
+        # Two stages: first spot whether the name plausibly covers more
+        # than one real business at all (generous, noisy directory results
+        # are enough for this), then confirm each one's actual site with a
+        # targeted search (strict, never guesses). Skip entirely if the
+        # user already resolved this (came back from the picker).
+        if company and not resolved_company:
+            candidate_raw = contact_finder.search_company_candidates(company, on_step=step)
+            topics = llm.identify_candidate_topics(company, candidate_raw)
+            candidates = []
+            if len(topics) > 1:
+                for topic in topics:
+                    domain = contact_finder.confirm_candidate_domain(company, topic.get("hint", ""), on_step=step)
+                    if domain:
+                        candidates.append({
+                            "name": topic.get("name") or company,
+                            "domain": urlparse(domain).netloc.replace("www.", ""),
+                            "description": topic.get("description", ""),
+                        })
+            if len(candidates) > 1:
+                step("Found more than one company with this name, asking which one")
+                _job_finish(job_id, {"kind": "disambiguate", "query": text, "name": company, "candidates": candidates})
+                return
 
         if not recipient and company:
-            contacts = contact_finder.find_contacts(company, on_step=step)
+            contacts = contact_finder.find_contacts(company, on_step=step, known_site=known_site)
             step("Picking the best contact for this")
             recipient = llm.pick_recipient(contacts, text)
 
         if info.get("intent") == "lookup" or not recipient:
             if contacts is None and company:
-                contacts = contact_finder.find_contacts(company, on_step=step)
-            if contacts and (contacts["emails"] or contacts["socials"] or contacts["socials_unverified"]):
+                contacts = contact_finder.find_contacts(company, on_step=step, known_site=known_site)
+            if contacts and (contacts["emails"] or contacts["socials"] or contacts["socials_unverified"] or contacts["phones"]):
                 profile_raw = contact_finder.find_company_profile(
                     company, contacts.get("site"), on_step=step
                 )
@@ -263,6 +322,11 @@ def _run_talon_job(job_id: str, text: str) -> None:
                 step("Working out who to contact and why now")
                 suggestions = llm.suggest_next_steps(text, company, contacts, profile, intent)
 
+                application_routes = contact_finder.find_application_routes(company, want, on_step=step)
+                step("Ranking the strongest contact routes")
+                routes = llm.rank_contact_routes(text, company, contacts, profile, application_routes, want)
+                routes["routes"] = _ensure_support_fallback_route(contacts, routes.get("routes", []))
+
                 similar_companies = _research_similar_companies(company, step)
 
                 report_id = reports.create_report(
@@ -274,6 +338,7 @@ def _run_talon_job(job_id: str, text: str) -> None:
                         "profile": profile,
                         "intent": intent,
                         "suggestions": suggestions,
+                        "routes": routes.get("routes", []),
                         "similar_companies": similar_companies,
                         "want": want,
                     },
@@ -289,6 +354,7 @@ def _run_talon_job(job_id: str, text: str) -> None:
                         "profile": profile,
                         "intent": intent,
                         "suggestions": suggestions,
+                        "routes": routes.get("routes", []),
                         "want": want,
                         "requested_found": _category_found(contacts, want),
                         "similar_companies": similar_companies,
@@ -337,6 +403,7 @@ def _run_talon_job(job_id: str, text: str) -> None:
             opening_email=draft["email_text"],
             channel="web",
             subject=draft.get("subject"),
+            company=company,
         )
         step("Done")
         _job_finish(
@@ -359,11 +426,18 @@ def talon_start():
     text = (data.get("text") or "").strip()
     if not text:
         return jsonify(error="Say something first."), 400
+    context_company = (data.get("context_company") or "").strip() or None
+    resolved_company = (data.get("resolved_company") or "").strip() or None
+    resolved_domain = (data.get("resolved_domain") or "").strip() or None
 
     job_id = uuid.uuid4().hex[:12]
     with _jobs_lock:
         _jobs[job_id] = {"steps": [], "done": False, "result": None}
-    threading.Thread(target=_run_talon_job, args=(job_id, text), daemon=True).start()
+    threading.Thread(
+        target=_run_talon_job,
+        args=(job_id, text, context_company, resolved_company, resolved_domain),
+        daemon=True,
+    ).start()
     return jsonify(job_id=job_id)
 
 
@@ -416,6 +490,175 @@ def google_signup():
         ),
         501,
     )
+
+
+_google_oauth_state = None
+
+
+@app.route("/api/google/status")
+def google_status():
+    return jsonify(configured=google_auth.is_configured(), connected=google_auth.is_connected())
+
+
+@app.route("/api/google/connect")
+def google_connect():
+    if not google_auth.is_configured():
+        return (
+            jsonify(
+                error="Gmail isn't connected yet, this button can't finish the OAuth "
+                "flow on its own. To wire it up: create a project at "
+                "console.cloud.google.com, enable the Gmail API, add an OAuth client "
+                "ID (type: Web application), and set GOOGLE_OAUTH_CLIENT_ID plus "
+                "GOOGLE_OAUTH_CLIENT_SECRET and GOOGLE_OAUTH_REDIRECT_URI in .env. "
+                "That's a one time setup only you can do, since it needs your own "
+                "Google account. Talon already sends through the Caspian email "
+                "channel without this, this step is only for reading your personal "
+                "Gmail inbox for context."
+            ),
+            501,
+        )
+    global _google_oauth_state
+    _google_oauth_state = uuid.uuid4().hex
+    return redirect(google_auth.build_auth_url(_google_oauth_state))
+
+
+@app.route("/api/google/callback")
+def google_callback():
+    global _google_oauth_state
+    error = request.args.get("error")
+    if error:
+        return redirect(f"/connect.html?gmail=error&reason={error}")
+
+    code = request.args.get("code")
+    returned_state = request.args.get("state")
+    if not code or not returned_state or returned_state != _google_oauth_state:
+        return redirect("/connect.html?gmail=error&reason=invalid_state")
+    _google_oauth_state = None
+
+    try:
+        tokens = google_auth.exchange_code(code)
+        google_auth.save_from_code_exchange(tokens)
+    except Exception:
+        return redirect("/connect.html?gmail=error&reason=token_exchange_failed")
+
+    return redirect("/connect.html?gmail=connected")
+
+
+@app.route("/api/google/disconnect", methods=["POST"])
+def google_disconnect():
+    google_auth.disconnect()
+    return jsonify(ok=True)
+
+
+@app.route("/api/github/status")
+def github_status():
+    profile = github_auth.get_profile()
+    return jsonify(connected=profile is not None, username=(profile or {}).get("username"))
+
+
+@app.route("/api/github/connect", methods=["POST"])
+def github_connect_route():
+    data = request.get_json(force=True, silent=True) or {}
+    token = (data.get("token") or "").strip()
+    if not token:
+        return jsonify(error="Paste a token first."), 400
+    try:
+        profile = github_auth.save_token(token)
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    return jsonify(ok=True, username=profile.get("username"))
+
+
+@app.route("/api/github/disconnect", methods=["POST"])
+def github_disconnect():
+    github_auth.disconnect()
+    return jsonify(ok=True)
+
+
+# Outlook, LinkedIn, and X all use the same OAuth 2.0 authorization-code
+# shape (oauth_connections.py), one small route set per provider so the
+# URLs stay predictable, but sharing all the actual logic.
+_oauth_pending: dict[str, dict] = {}
+
+_PROVIDER_UNCONFIGURED_NOTES = {
+    "outlook": (
+        "Outlook isn't connected yet, this button can't finish the OAuth flow "
+        "on its own. To wire it up: register an app at "
+        "portal.azure.com (Azure Entra ID > App registrations), add a Web "
+        "redirect URI, and set OUTLOOK_OAUTH_CLIENT_ID plus "
+        "OUTLOOK_OAUTH_CLIENT_SECRET and OUTLOOK_OAUTH_REDIRECT_URI in .env. "
+        "That's a one time setup only you can do, since it needs your own "
+        "Microsoft account."
+    ),
+    "linkedin": (
+        "LinkedIn isn't connected yet, this button can't finish the OAuth "
+        "flow on its own. To wire it up: create an app at "
+        "developer.linkedin.com with the \"Sign In with LinkedIn using "
+        "OpenID Connect\" product added, add a redirect URL, and set "
+        "LINKEDIN_OAUTH_CLIENT_ID plus LINKEDIN_OAUTH_CLIENT_SECRET and "
+        "LINKEDIN_OAUTH_REDIRECT_URI in .env. That's a one time setup only "
+        "you can do. Note LinkedIn only grants basic profile access "
+        "(name, email) to a standard app, reading your network needs "
+        "LinkedIn's own partner approval, which is outside what this "
+        "button can offer."
+    ),
+    "x": (
+        "X isn't connected yet, this button can't finish the OAuth flow on "
+        "its own. To wire it up: create a project and app at "
+        "developer.x.com, enable OAuth 2.0 with a Web app redirect URI, "
+        "and set X_OAUTH_CLIENT_ID plus X_OAUTH_CLIENT_SECRET and "
+        "X_OAUTH_REDIRECT_URI in .env. That's a one time setup only you "
+        "can do, since it needs your own X developer account."
+    ),
+}
+
+
+def _register_oauth_routes(provider: str) -> None:
+    @app.route(f"/api/{provider}/status", endpoint=f"{provider}_status")
+    def _status():
+        return jsonify(
+            configured=oauth_connections.is_configured(provider),
+            connected=oauth_connections.is_connected(provider),
+        )
+
+    @app.route(f"/api/{provider}/connect", endpoint=f"{provider}_connect")
+    def _connect():
+        if not oauth_connections.is_configured(provider):
+            return jsonify(error=_PROVIDER_UNCONFIGURED_NOTES[provider]), 501
+        state = uuid.uuid4().hex
+        auth_url, code_verifier = oauth_connections.build_auth_url(provider, state)
+        _oauth_pending[provider] = {"state": state, "verifier": code_verifier}
+        return redirect(auth_url)
+
+    @app.route(f"/api/{provider}/callback", endpoint=f"{provider}_callback")
+    def _callback():
+        error = request.args.get("error")
+        if error:
+            return redirect(f"/connect.html?{provider}=error&reason={error}")
+
+        code = request.args.get("code")
+        returned_state = request.args.get("state")
+        pending = _oauth_pending.get(provider)
+        if not code or not pending or returned_state != pending.get("state"):
+            return redirect(f"/connect.html?{provider}=error&reason=invalid_state")
+        _oauth_pending.pop(provider, None)
+
+        try:
+            tokens = oauth_connections.exchange_code(provider, code, pending.get("verifier"))
+            oauth_connections.save_from_code_exchange(provider, tokens)
+        except Exception:
+            return redirect(f"/connect.html?{provider}=error&reason=token_exchange_failed")
+
+        return redirect(f"/connect.html?{provider}=connected")
+
+    @app.route(f"/api/{provider}/disconnect", methods=["POST"], endpoint=f"{provider}_disconnect")
+    def _disconnect():
+        oauth_connections.disconnect(provider)
+        return jsonify(ok=True)
+
+
+for _provider in ("outlook", "linkedin", "x"):
+    _register_oauth_routes(_provider)
 
 
 if __name__ == "__main__":

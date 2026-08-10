@@ -45,33 +45,45 @@
   .skip { font-size: 14px; color: var(--muted); text-decoration: none; }
   .skip:hover { color: var(--text); }
 
-  .stage { flex: 1; display: flex; justify-content: center; padding: 24px; }
-  .stage-inner { width: 100%; max-width: 560px; padding-top: 48px; }
-
-  .slide { display: none; }
-  .slide.active { display: block; }
-
-  .slide h1 { font-size: 38px; margin: 0 0 40px; letter-spacing: -0.02em; line-height: 1.15; }
-
-  .field { margin-bottom: 28px; }
-  .field label {
-    display: block;
-    font-size: 15px;
-    font-weight: 600;
-    margin-bottom: 10px;
+  .stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 24px 24px;
+    text-align: center;
   }
-  .field label .tag { font-weight: 400; color: var(--muted); }
-  .info-box {
+  .stage-inner { width: 100%; max-width: 640px; display: flex; flex-direction: column; align-items: center; }
+
+  .slide { display: none; width: 100%; flex-direction: column; align-items: center; }
+  .slide.active { display: flex; }
+
+  .slide-eyebrow {
+    font-size: 11.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px;
+  }
+  .slide h1 { font-size: 30px; margin: 0 0 12px; letter-spacing: -0.02em; line-height: 1.15; }
+  .slide .sub {
+    font-size: 15px; color: var(--muted); line-height: 1.55;
+    max-width: 480px; margin: 0 auto 26px;
+  }
+
+  .shot-frame {
+    width: 100%;
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 16px 20px;
-    font-size: 15px;
-    color: var(--muted);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.09);
+    margin-bottom: 8px;
     background: var(--panel);
-    line-height: 1.55;
   }
+  .shot-frame img { display: block; width: 100%; height: auto; }
 
-  .next-row { margin-top: 8px; }
+  .next-row {
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    margin-top: 28px;
+  }
   .btn-next {
     font-size: 15px;
     font-weight: 500;
@@ -88,8 +100,7 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 12px 4px;
-    margin-right: 12px;
+    padding: 12px 16px;
   }
   .btn-back.ghost { visibility: hidden; }
 
@@ -98,7 +109,7 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 0 24px 56px;
+    padding: 0 24px 40px;
   }
   .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--border); transition: all 0.2s ease; }
   .dot.active { width: 22px; background: var(--accent); }
@@ -118,40 +129,36 @@
   <div class="stage">
     <div class="stage-inner">
 
-      <!-- Slide 1 -->
+      <!-- Slide 1: real screenshot of Talon actively researching -->
       <div class="slide active" data-slide="0">
-        <h1>Welcome to Talon</h1>
-        <div class="field">
-          <label>What Talon does</label>
-          <div class="info-box">Talon takes over a stuck support conversation, figures out when it's talking to a bot instead of a person, and keeps pushing until a real human responds.</div>
-        </div>
+        <div class="slide-eyebrow">Give it a company and a goal</div>
+        <h1>Talon researches in real time, right in front of you</h1>
+        <p class="sub">No black box. Every page it checks, every search it runs, shows up live while it works.</p>
+        <div class="shot-frame"><img src="assets/onboarding-working.png" alt="Talon actively researching a company, showing live steps"></div>
       </div>
 
-      <!-- Slide 2 -->
+      <!-- Slide 2: real completed result -->
       <div class="slide" data-slide="1">
-        <h1>How it reaches people</h1>
-        <div class="field">
-          <label>Talon Relay</label>
-          <div class="info-box">Talon emails the company directly on your behalf and keeps the entire back-and-forth in one thread. You never have to relay messages yourself.</div>
-        </div>
+        <div class="slide-eyebrow">Not a pile of emails</div>
+        <h1>You get who to contact and why</h1>
+        <p class="sub">Founders, what they offer, who they're looking for, and every real contact route found, all in one result.</p>
+        <div class="shot-frame"><img src="assets/onboarding-result.png" alt="A completed Talon result showing founders and contact info"></div>
       </div>
 
-      <!-- Slide 3 -->
+      <!-- Slide 3: real ranked routes with confidence -->
       <div class="slide" data-slide="2">
-        <h1>How it decides</h1>
-        <div class="field">
-          <label>Talon Core <span class="tag">(powered by Caspian)</span></label>
-          <div class="info-box">Every reply gets read and judged as bot or human, using Caspian's multi-channel agent framework as the backbone that connects Talon to email, Telegram, and everywhere else it needs to reach.</div>
-        </div>
+        <div class="slide-eyebrow">Ranked, with reasoning</div>
+        <h1>Every route comes with a confidence level and a reason</h1>
+        <p class="sub">A named contact, an application, an email, a social profile, ranked by how likely each one is to actually get you a response.</p>
+        <div class="shot-frame"><img src="assets/onboarding-report.png" alt="A report page showing ranked contact routes with confidence levels"></div>
       </div>
 
-      <!-- Slide 4 -->
+      <!-- Slide 4: real Map with next steps -->
       <div class="slide" data-slide="3">
-        <h1>How you stay in the loop</h1>
-        <div class="field">
-          <label>Talon Signal</label>
-          <div class="info-box">The moment a real person responds, or the issue is actually resolved, Talon pings you. Not before.</div>
-        </div>
+        <div class="slide-eyebrow">A plan, not just data</div>
+        <h1>The Map turns findings into your next move</h1>
+        <p class="sub">The strongest move right now, what happens if it doesn't land, and questions worth asking to dig further.</p>
+        <div class="shot-frame"><img src="assets/onboarding-map.png" alt="The Map page showing next steps and follow-up questions"></div>
       </div>
 
       <!-- Add new slides above this line as more features are decided -->

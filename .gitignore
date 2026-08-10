@@ -6,3 +6,8 @@ cases.json
 node_modules/
 reports.json
 users.db
+google_tokens.json
+outlook_tokens.json
+linkedin_tokens.json
+x_tokens.json
+github_token.json

@@ -85,6 +85,14 @@
     border-bottom: 1px solid var(--border);
   }
   .topbar h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .new-chat-btn {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 500; color: var(--text);
+    border: 1px solid var(--border); background: var(--bg);
+    border-radius: 9px; padding: 8px 14px; cursor: pointer;
+  }
+  .new-chat-btn:hover { background: var(--panel); }
   .back-btn {
     width: 34px; height: 34px;
     border-radius: 9px;
@@ -529,6 +537,7 @@
     background: #fdf1e7; border: 1px solid #f0d9b8;
     border-radius: 10px; padding: 9px 12px;
   }
+  .contact-gap-note a { color: #7a4a12; font-weight: 600; word-break: break-all; }
   .contact-row-action {
     flex-shrink: 0;
     font-size: 11.5px; font-weight: 600;
@@ -552,6 +561,39 @@
     font-size: 12.5px; line-height: 1.5; color: var(--muted);
     border-top: 1px solid var(--border); padding-top: 12px;
   }
+  .contact-next-steps-btn {
+    align-self: flex-start;
+    font-size: 12px; font-weight: 600; color: #fff;
+    background: var(--accent); border: none;
+    border-radius: 999px; padding: 7px 14px;
+    cursor: pointer; margin-top: -4px;
+  }
+  .contact-next-steps-btn:hover { opacity: 0.85; }
+  .contact-next-steps-btn:disabled { opacity: 0.5; cursor: default; }
+
+  .disambiguate-list { display: flex; flex-direction: column; gap: 10px; }
+  .disambiguate-option {
+    display: flex; align-items: center; gap: 12px;
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 11px 14px; background: var(--bg);
+    cursor: pointer; text-align: left; width: 100%;
+    font-family: inherit;
+  }
+  .disambiguate-option:hover { background: var(--panel-2); }
+  .disambiguate-logo {
+    width: 34px; height: 34px; border-radius: 8px; object-fit: contain;
+    flex-shrink: 0; background: #fff; border: 1px solid var(--border);
+  }
+  .disambiguate-logo-fallback {
+    width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700;
+  }
+  .disambiguate-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .disambiguate-name { font-size: 13.5px; font-weight: 700; }
+  .disambiguate-domain { font-size: 11px; color: var(--muted); }
+  .disambiguate-desc { font-size: 12px; color: var(--muted); line-height: 1.4; margin-top: 2px; }
 
   .backend-banner {
     display: none;
@@ -591,11 +633,11 @@
     <a class="rail-btn" href="cases.html" data-tip="Cases">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
     </a>
-    <a class="rail-btn" href="schedule.html" data-tip="Schedule">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-    </a>
     <a class="rail-btn" href="report.html" data-tip="Report">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+    </a>
+    <a class="rail-btn" href="map.html" data-tip="Map">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 4v16"/><path d="M15 6v16"/></svg>
     </a>
     <div class="rail-spacer"></div>
     <a class="rail-btn" href="connect.html" data-tip="Connect">
@@ -615,6 +657,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
       </button>
       <h1>Home</h1>
+      <button class="new-chat-btn" id="new-chat-btn" title="Start a new chat">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        New chat
+      </button>
     </div>
 
     <div class="backend-banner" id="backend-banner"></div>
@@ -825,6 +871,7 @@
       other: 'Other',
     };
     const EMAIL_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>';
+    const PHONE_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3.1-8.7A2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .3 2 .7 3a2 2 0 01-.4 2.1L8 10.3a16 16 0 006 6l1.5-1.4a2 2 0 012.1-.4c1 .4 2 .6 3 .7a2 2 0 011.7 2z"/></svg>';
     const SOCIAL_META = {
       linkedin: { label: 'LinkedIn', color: '#0a66c2', svg: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M6.94 8.5H3.56V20h3.38V8.5zM5.25 3.6a1.96 1.96 0 100 3.92 1.96 1.96 0 000-3.92zM20.44 20h-3.37v-5.6c0-1.34-.02-3.05-1.86-3.05-1.87 0-2.16 1.46-2.16 2.96V20H9.68V8.5h3.24v1.57h.05c.45-.86 1.56-1.76 3.21-1.76 3.44 0 4.26 2.26 4.26 5.2V20z"/></svg>' },
       twitter: { label: 'X / Twitter', color: '#111110', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M4 4l16 16"/><path d="M20 4L4 20"/></svg>' },
@@ -978,6 +1025,9 @@
           ));
         });
       });
+      (contacts.phones || []).forEach((phone) => {
+        wrap.appendChild(contactRow(PHONE_ICON_SVG, '#34a853', 'Phone', phone, `tel:${phone}`));
+      });
       Object.entries(contacts.socials || {}).forEach(([name, url]) => {
         const meta = SOCIAL_META[name] || { label: name, color: '#6b6b68', svg: EMAIL_ICON_SVG };
         wrap.appendChild(contactRow(meta.svg, meta.color, meta.label, socialHandle(name, url), url));
@@ -985,7 +1035,7 @@
       return wrap;
     }
 
-    function renderContactsCard(company, contacts, profile, want, requestedFound, similarCompanies, reportId) {
+    function renderContactsCard(company, contacts, profile, want, requestedFound, similarCompanies, reportId, routes) {
       const card = document.createElement('div');
       card.className = 'contact-card';
 
@@ -1020,6 +1070,27 @@
         card.appendChild(gap);
       }
 
+      // No partnership or general email at all is the case worth calling
+      // out directly, since those are the two categories people actually
+      // reach out through -- point straight at their own support/contact
+      // page instead of leaving the user with nothing.
+      const hasDirectEmail = Boolean(
+        (contacts.emails && contacts.emails.partnership && contacts.emails.partnership.length) ||
+        (contacts.emails && contacts.emails.general && contacts.emails.general.length)
+      );
+      if (!hasDirectEmail && contacts.support_page) {
+        const fallback = document.createElement('div');
+        fallback.className = 'contact-gap-note';
+        fallback.append(`No partnership or support email found for ${company}. Here's their support page directly: `);
+        const link = document.createElement('a');
+        link.href = contacts.support_page;
+        link.textContent = contacts.support_page;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        fallback.appendChild(link);
+        card.appendChild(fallback);
+      }
+
       if (profile) {
         const profileSection = renderProfileSection(profile);
         if (profileSection) card.appendChild(profileSection);
@@ -1041,6 +1112,20 @@
               email, `mailto:${email}`, email,
             ));
           });
+        });
+        card.appendChild(section);
+      }
+
+      const phones = contacts.phones || [];
+      if (phones.length) {
+        const section = document.createElement('div');
+        section.className = 'contact-section';
+        const label = document.createElement('div');
+        label.className = 'contact-section-label';
+        label.textContent = 'Phone numbers';
+        section.appendChild(label);
+        phones.forEach((phone) => {
+          section.appendChild(contactRow(PHONE_ICON_SVG, '#34a853', 'Phone', phone, `tel:${phone}`));
         });
         card.appendChild(section);
       }
@@ -1079,7 +1164,7 @@
         card.appendChild(section);
       }
 
-      if (!emailEntries.length && !socials.length && !unverified.length) {
+      if (!emailEntries.length && !phones.length && !socials.length && !unverified.length) {
         const empty = document.createElement('div');
         empty.className = 'contact-empty';
         empty.textContent = 'No public contact info found.';
@@ -1113,7 +1198,39 @@
       followUp.textContent = 'Want me to send a message to any of these? Tell me who and what to say, or click "Message" next to an email.';
       card.appendChild(followUp);
 
+      if (reportId) {
+        const nextStepsBtn = document.createElement('button');
+        nextStepsBtn.type = 'button';
+        nextStepsBtn.className = 'contact-next-steps-btn';
+        nextStepsBtn.textContent = "What's next?";
+        nextStepsBtn.addEventListener('click', () => {
+          nextStepsBtn.disabled = true;
+          agentReply(composeNextStepsSummary(company, routes, similarCompanies), 500);
+        });
+        card.appendChild(nextStepsBtn);
+      }
+
       return card;
+    }
+
+    // Composed client-side from the same data already on screen -- no extra
+    // backend call, just a plain-language recap of what got saved and what
+    // Talon can do from here.
+    function composeNextStepsSummary(company, routes, similarCompanies) {
+      const parts = [`I've saved a full report on ${company} and added it to your Map.`];
+      if (routes && routes.length) {
+        const top = routes[0];
+        parts.push(`Best route so far: ${top.label}${top.confidence ? ` (${top.confidence} confidence)` : ''}.`);
+        if (routes.length > 1) {
+          parts.push(`I ranked ${routes.length} routes total, from most to least likely to get a response, check the Map for the full order.`);
+        }
+      }
+      if (similarCompanies && similarCompanies.length) {
+        const n = similarCompanies.length;
+        parts.push(`I also looked into ${n} comparable ${n === 1 ? 'company' : 'companies'} in case this one goes cold.`);
+      }
+      parts.push('From here I can draft outreach, keep tracking replies automatically once it is sent, or dig into a different angle, just tell me what you need.');
+      return parts.join(' ');
     }
 
     const SEND_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>';
@@ -1168,16 +1285,172 @@
       return card;
     }
 
+    // Several real, unrelated companies can share a name (Coda the
+    // workspace vs Coda the payments platform). Rather than guess and
+    // possibly research the wrong one, show the real candidates found and
+    // let the user pick -- logo via Google's public favicon service, falls
+    // back to an initial if a domain has none.
+    function renderDisambiguationCard(result) {
+      const card = document.createElement('div');
+      card.className = 'contact-card';
+      const title = document.createElement('div');
+      title.className = 'contact-card-title';
+      title.textContent = `A few companies go by "${result.name}", which one?`;
+      card.appendChild(title);
+
+      const list = document.createElement('div');
+      list.className = 'disambiguate-list';
+      (result.candidates || []).forEach((c) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'disambiguate-option';
+
+        const logo = document.createElement('img');
+        logo.className = 'disambiguate-logo';
+        logo.src = `https://www.google.com/s2/favicons?domain=${c.domain}&sz=64`;
+        logo.alt = '';
+        const fallback = document.createElement('span');
+        fallback.className = 'disambiguate-logo-fallback';
+        fallback.textContent = (c.name || '?').charAt(0).toUpperCase();
+        fallback.style.display = 'none';
+        logo.addEventListener('error', () => {
+          logo.style.display = 'none';
+          fallback.style.display = 'flex';
+        });
+        btn.appendChild(logo);
+        btn.appendChild(fallback);
+
+        const textWrap = document.createElement('div');
+        textWrap.className = 'disambiguate-text';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'disambiguate-name';
+        nameEl.textContent = c.name;
+        textWrap.appendChild(nameEl);
+        const domainEl = document.createElement('div');
+        domainEl.className = 'disambiguate-domain';
+        domainEl.textContent = c.domain;
+        textWrap.appendChild(domainEl);
+        if (c.description) {
+          const descEl = document.createElement('div');
+          descEl.className = 'disambiguate-desc';
+          descEl.textContent = c.description;
+          textWrap.appendChild(descEl);
+        }
+        btn.appendChild(textWrap);
+
+        btn.addEventListener('click', () => chooseDisambiguationCandidate(result.query, c));
+        list.appendChild(btn);
+      });
+      card.appendChild(list);
+      return card;
+    }
+
+    async function chooseDisambiguationCandidate(query, candidate) {
+      const chosenText = `${candidate.name} (${candidate.domain})`;
+      addBubble('user', chosenText);
+      appendTurn({ role: 'user', text: chosenText });
+      const bubble = createPendingAgentBubble();
+      try {
+        const startRes = await fetch(`${TALON_API}/api/talon/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: query, resolved_company: candidate.name, resolved_domain: candidate.domain }),
+        });
+        const startData = await startRes.json();
+        if (!startData.job_id) throw new Error(startData.error || 'failed to start');
+        saveActiveJob(startData.job_id, query, false);
+        await pollJobAndRender(startData.job_id, bubble, false);
+      } catch (err) {
+        bubble.classList.remove('typing');
+        bubble.textContent = `Couldn't reach Talon's backend at ${TALON_API || location.origin} (${err.message}).`;
+        checkBackend();
+      }
+    }
+
     // Live version: actually calls the backend agent, polls for progress, and
     // opens the agent activity panel while it works.
-    async function sendToTalonLive(text) {
-      text = text.trim();
-      if (!text) return;
-      const isFirst = !chatStarted;
-      enterChatMode();
-      addBubble('user', text);
-      openAgentPanel();
+    // The job itself runs server-side in its own thread -- it was never
+    // actually stopped by navigating away. What broke was the UI losing
+    // track of it, since polling lived only in this page's memory. Persist
+    // the active job so leaving Home and coming back (or even closing the
+    // tab) resumes watching it, or shows the result immediately if it
+    // finished while you were away.
+    const ACTIVE_JOB_KEY = 'talon_active_job';
 
+    function saveActiveJob(jobId, text, isFirst) {
+      localStorage.setItem(ACTIVE_JOB_KEY, JSON.stringify({ jobId, text, isFirst }));
+    }
+    function clearActiveJob() {
+      localStorage.removeItem(ACTIVE_JOB_KEY);
+    }
+    function loadActiveJob() {
+      try { return JSON.parse(localStorage.getItem(ACTIVE_JOB_KEY) || 'null'); } catch (e) { return null; }
+    }
+
+    // The whole conversation persists (not just whatever's in flight), so
+    // closing the tab or clicking around the app never loses it -- only
+    // "New chat" clears it. Capped so localStorage doesn't grow unbounded.
+    const TRANSCRIPT_KEY = 'talon_chat_history';
+    const MAX_TURNS = 60;
+
+    function loadTranscript() {
+      try {
+        return JSON.parse(localStorage.getItem(TRANSCRIPT_KEY)) || { turns: [], lastCompany: null };
+      } catch (e) {
+        return { turns: [], lastCompany: null };
+      }
+    }
+    function saveTranscript(t) {
+      localStorage.setItem(TRANSCRIPT_KEY, JSON.stringify(t));
+    }
+    function appendTurn(turn, company) {
+      const t = loadTranscript();
+      t.turns.push(turn);
+      if (t.turns.length > MAX_TURNS) t.turns = t.turns.slice(-MAX_TURNS);
+      if (company) t.lastCompany = company;
+      saveTranscript(t);
+    }
+    function clearTranscript() {
+      localStorage.removeItem(TRANSCRIPT_KEY);
+    }
+
+    function renderResultIntoBubble(bubble, result) {
+      bubble.classList.remove('typing');
+      bubble.textContent = '';
+      if (result && result.kind === 'contacts') {
+        bubble.appendChild(renderContactsCard(
+          result.company, result.contacts, result.profile,
+          result.want, result.requested_found, result.similar_companies,
+          result.report_id, result.routes,
+        ));
+      } else if (result && result.kind === 'outreach') {
+        bubble.appendChild(renderOutreachCard(result));
+      } else if (result && result.kind === 'disambiguate') {
+        bubble.appendChild(renderDisambiguationCard(result));
+      } else {
+        bubble.textContent = (result && result.reply) || 'Something went wrong, try again.';
+      }
+    }
+
+    function renderTurn(turn) {
+      if (turn.role === 'user') {
+        addBubble('user', turn.text);
+        return;
+      }
+      const msg = document.createElement('div');
+      msg.className = 'chat-msg agent';
+      const av = document.createElement('span');
+      av.className = 'chat-avatar-mini';
+      av.innerHTML = '<img src="assets/logo.png" alt="">';
+      msg.appendChild(av);
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-bubble';
+      msg.appendChild(bubble);
+      chat.appendChild(msg);
+      renderResultIntoBubble(bubble, turn.data);
+    }
+
+    function createPendingAgentBubble() {
       const msg = document.createElement('div');
       msg.className = 'chat-msg agent';
       const av = document.createElement('span');
@@ -1190,51 +1463,67 @@
       msg.appendChild(bubble);
       chat.appendChild(msg);
       chat.scrollTop = chat.scrollHeight;
+      return bubble;
+    }
 
+    async function pollJobAndRender(jobId, bubble, isFirst) {
+      openAgentPanel();
       try {
-        const startRes = await fetch(`${TALON_API}/api/talon/start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
-        });
-        const startData = await startRes.json();
-        if (!startData.job_id) throw new Error(startData.error || 'failed to start');
-
         let result = null;
         while (true) {
-          await new Promise((resolve) => setTimeout(resolve, 350));
-          const statusRes = await fetch(`${TALON_API}/api/talon/status/${startData.job_id}`);
+          const statusRes = await fetch(`${TALON_API}/api/talon/status/${jobId}`);
           const statusData = await statusRes.json();
           renderAgentSteps(statusData.steps || [], statusData.done);
           if (statusData.done) { result = statusData.result; break; }
+          await new Promise((resolve) => setTimeout(resolve, 350));
         }
 
-        bubble.classList.remove('typing');
-        if (result && result.kind === 'contacts') {
-          bubble.textContent = '';
-          bubble.appendChild(renderContactsCard(
-            result.company, result.contacts, result.profile,
-            result.want, result.requested_found, result.similar_companies,
-            result.report_id,
-          ));
-        } else if (result && result.kind === 'outreach') {
-          bubble.textContent = '';
-          bubble.appendChild(renderOutreachCard(result));
-        } else {
+        if (!result || (result.kind !== 'contacts' && result.kind !== 'outreach' && result.kind !== 'disambiguate')) {
           const replyText = (result && result.reply) || 'Something went wrong, try again.';
-          bubble.textContent = isFirst ? `Hi ${displayName}. ${replyText}` : replyText;
+          result = { kind: 'message', reply: isFirst ? `Hi ${displayName}. ${replyText}` : replyText };
         }
+        renderResultIntoBubble(bubble, result);
+        appendTurn({ role: 'agent', kind: result.kind, data: result }, result.company || null);
+        clearActiveJob();
       } catch (err) {
         renderAgentSteps(['Lost connection to the backend'], true);
         bubble.classList.remove('typing');
         bubble.textContent =
           `Couldn't reach Talon's backend at ${TALON_API || location.origin} (${err.message}). ` +
           "Make sure server.py is actually running: `python server.py` in the " +
-          "caspian hackathon folder. This page itself can be served from " +
-          "anywhere (Live Server, direct, etc.), it just needs that process up.";
+          "caspian hackathon folder. The job itself is still running there, " +
+          "reload this page once it's back up to pick the result back up.";
         checkBackend();
       }
       chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function sendToTalonLive(text) {
+      text = text.trim();
+      if (!text) return;
+      const isFirst = !chatStarted;
+      enterChatMode();
+      addBubble('user', text);
+      appendTurn({ role: 'user', text });
+      const bubble = createPendingAgentBubble();
+
+      try {
+        const startRes = await fetch(`${TALON_API}/api/talon/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, context_company: loadTranscript().lastCompany }),
+        });
+        const startData = await startRes.json();
+        if (!startData.job_id) throw new Error(startData.error || 'failed to start');
+        saveActiveJob(startData.job_id, text, isFirst);
+        await pollJobAndRender(startData.job_id, bubble, isFirst);
+      } catch (err) {
+        bubble.classList.remove('typing');
+        bubble.textContent =
+          `Couldn't reach Talon's backend at ${TALON_API || location.origin} (${err.message}). ` +
+          "Make sure server.py is actually running.";
+        checkBackend();
+      }
     }
 
     // --- Backend reachability check, so a wrong origin (file://, a static-file
@@ -1273,7 +1562,39 @@
         .join(' ') || 'there';
 
       document.getElementById('hero-heading').textContent = `What do you need Talon to do, ${displayName}?`;
+
+      // The conversation isn't limited to one page view -- replay whatever
+      // was said before, so the chat keeps going across reloads instead of
+      // resetting every time you come back to Home.
+      const transcript = loadTranscript();
+      if (transcript.turns.length) {
+        enterChatMode();
+        transcript.turns.forEach(renderTurn);
+        chat.scrollTop = chat.scrollHeight;
+      }
+
+      // Pick a job back up if one was left running (navigated away, closed
+      // the tab, whatever) -- the backend never stopped working on it, so
+      // resume watching it instead of losing track. Its user turn is
+      // already in the transcript above (recorded at send time), so only
+      // the pending agent bubble needs adding here.
+      const pending = loadActiveJob();
+      if (pending) {
+        enterChatMode();
+        const bubble = createPendingAgentBubble();
+        pollJobAndRender(pending.jobId, bubble, pending.isFirst);
+      }
     }
+
+    function startNewChat() {
+      clearTranscript();
+      clearActiveJob();
+      chat.innerHTML = '';
+      chatStarted = false;
+      contentWrap.classList.remove('chat-mode');
+      workspace.classList.remove('panel-open');
+    }
+    document.getElementById('new-chat-btn').addEventListener('click', startNewChat);
 
     function logout() {
       localStorage.removeItem('talon_user');
@@ -1294,6 +1615,16 @@
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') document.getElementById('composer-send').click();
     });
+
+    // Coming from the Map's "Draft this now" link: prefill the composer
+    // with the suggested opener instead of making the user retype it.
+    const prefill = new URLSearchParams(location.search).get('prefill');
+    if (prefill) {
+      input.value = prefill;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      history.replaceState(null, '', 'home.html');
+    }
     document.getElementById('ask-attach').addEventListener('click', () => {
       enterChatMode();
       agentReply("Attachments aren't wired up yet.");

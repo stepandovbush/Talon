@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talon Map</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f4f4f3;
+    --panel-2: #ececea;
+    --border: #e4e4e1;
+    --text: #111110;
+    --muted: #6b6b68;
+    --accent: #111110;
+    --online: #4caf7d;
+    --amber: #b8860b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .rail {
+    width: 72px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px 0; gap: 14px;
+  }
+  .rail-logo { display: block; margin-bottom: 22px; }
+  .rail-logo img { height: 20px; width: auto; display: block; }
+  .rail-btn {
+    position: relative; width: 46px; height: 46px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); cursor: pointer; text-decoration: none;
+  }
+  .rail-btn.active { background: var(--panel); color: var(--text); }
+  .rail-btn:hover { background: var(--panel); color: var(--text); }
+  .rail-spacer { flex: 1; }
+  .rail-btn::after {
+    content: attr(data-tip); position: absolute; left: 56px; top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    background: var(--text); color: #fff; font-size: 12px; font-weight: 500;
+    padding: 5px 10px; border-radius: 7px; white-space: nowrap;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.12s ease, transform 0.12s ease; z-index: 20;
+  }
+  .rail-btn:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+  .rail-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+  }
+
+  .main { flex: 1; display: flex; flex-direction: column; }
+  .topbar { display: flex; align-items: center; padding: 18px 28px; border-bottom: 1px solid var(--border); }
+  .topbar h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .back-btn {
+    width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; margin-right: 6px;
+  }
+  .back-btn:hover { background: var(--panel); }
+
+  .content { flex: 1; padding: 28px; max-width: 960px; width: 100%; margin: 0 auto; }
+  .lede { font-size: 13.5px; color: var(--muted); margin: 0 auto 22px; max-width: 480px; line-height: 1.5; text-align: center; }
+
+  .empty-state {
+    flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 80px 24px;
+  }
+  .placeholder-icon {
+    width: 64px; height: 64px; border-radius: 16px; background: var(--panel);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); margin-bottom: 20px;
+  }
+  .empty-state h2 { font-size: 19px; margin: 0 0 8px; }
+  .empty-state p { font-size: 14px; color: var(--muted); max-width: 340px; margin: 0; }
+
+  /* List view: every researched company as a node, connected to companies
+     it turned up as similar/related, so the whole research history reads
+     as one map instead of a flat list. */
+  .graph-wrap {
+    position: relative;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 20px;
+    padding: 48px 32px 32px;
+  }
+  .graph-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  .graph-tier { display: flex; flex-wrap: wrap; gap: 16px 14px; justify-content: center; position: relative; z-index: 1; }
+  .graph-tier + .graph-tier { margin-top: 64px; }
+  .graph-node {
+    border: 1px solid var(--border); border-radius: 14px; background: var(--bg);
+    padding: 12px 16px; cursor: pointer; text-align: center; min-width: 128px; max-width: 200px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    transition: background 0.12s ease, transform 0.12s ease;
+  }
+  .graph-node:hover { background: var(--panel-2); transform: translateY(-1px); }
+  .graph-node-primary { border-color: var(--text); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+  .graph-node-label { font-size: 13.5px; font-weight: 700; }
+  .graph-node-sub { font-size: 10.5px; color: var(--muted); }
+  .graph-node-satellite { border-style: dashed; background: var(--panel-2); }
+  .graph-node-satellite:hover { background: var(--bg); }
+  .graph-node-satellite .graph-node-label { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  .graph-legend { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 28px; font-size: 11px; color: var(--muted); }
+  .graph-legend-item { display: flex; align-items: center; gap: 6px; }
+  .graph-legend-swatch { width: 20px; height: 0; border-top: 1.5px solid var(--muted); }
+  .graph-legend-swatch.dashed { border-top-style: dashed; }
+
+  /* Detail (map) view */
+  /* The graph (list-view) uses the full widened .content, the single-company
+     hub view keeps the original narrower width so it doesn't stretch out. */
+  #detail-view { display: none; max-width: 680px; margin: 0 auto; }
+  .detail-header { margin-bottom: 24px; }
+  .detail-title { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .detail-sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+  /* Flow diagram: a hub node (the company) with dashed lines fanning down
+     to what was gathered about it, echoing the architecture-diagram look. */
+  .map-diagram {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 18px;
+    padding: 26px 20px 24px; margin-bottom: 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 24px;
+  }
+  .map-hub { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .map-hub-icon {
+    width: 54px; height: 54px; border-radius: 16px;
+    background: var(--bg); border: 1px solid var(--border);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .map-hub-icon img { width: 22px; height: auto; display: block; }
+  .map-hub-label { font-size: 14px; font-weight: 700; }
+
+  .map-branches {
+    display: flex; gap: 26px; flex-wrap: wrap; justify-content: center;
+    position: relative; width: 100%; padding-top: 24px;
+  }
+  .map-branches::before {
+    content: ''; position: absolute; top: 0; left: 12%; right: 12%; height: 1px;
+    background: repeating-linear-gradient(to right, var(--border) 0 4px, transparent 4px 8px);
+  }
+  .map-branch { display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; width: 108px; }
+  .map-branch::before {
+    content: ''; position: absolute; top: -24px; left: 50%; width: 1px; height: 24px;
+    background: repeating-linear-gradient(to bottom, var(--border) 0 4px, transparent 4px 8px);
+  }
+  .map-branch-icon {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--bg); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; color: var(--muted);
+  }
+  .map-branch-icon svg { width: 16px; height: 16px; }
+  .map-branch-label { font-size: 11.5px; font-weight: 700; text-align: center; }
+  .map-branch-sub { font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.3; }
+
+  .map-section { margin-bottom: 4px; }
+  .map-connector { display: flex; justify-content: center; padding: 2px 0; }
+  .map-section-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px;
+  }
+  .next-step-list { display: flex; flex-direction: column; gap: 10px; }
+  .next-step-card {
+    border: 1px solid var(--border); border-radius: 12px; background: var(--panel);
+    padding: 13px 15px; display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; flex-wrap: wrap;
+  }
+  .next-step-text { font-size: 13px; line-height: 1.5; color: var(--text); }
+  .next-step-cta {
+    flex-shrink: 0; text-decoration: none;
+    font-size: 12px; font-weight: 600; color: #fff;
+    background: var(--accent); border-radius: 999px; padding: 7px 14px;
+  }
+  .next-step-cta:hover { opacity: 0.85; }
+  .next-step-link { flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--text); text-decoration: underline; }
+
+  .question-list { display: flex; flex-wrap: wrap; gap: 9px; }
+  .question-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 9px 14px; font-size: 12.5px; font-weight: 500;
+    background: var(--bg); cursor: pointer; text-decoration: none; color: var(--text);
+  }
+  .question-chip:hover { background: var(--panel-2); }
+
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+  .history-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
+    padding: 10px 13px; text-decoration: none; color: var(--text);
+  }
+  .history-row:hover { background: var(--panel-2); }
+  .history-query { font-size: 12.5px; font-weight: 600; }
+  .history-date { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+</style>
+</head>
+<body>
+  <div class="rail">
+    <a class="rail-logo" href="index.html"><img src="assets/logo.png" alt="Talon logo"></a>
+    <a class="rail-btn" href="home.html" data-tip="Home">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>
+    </a>
+    <a class="rail-btn" href="cases.html" data-tip="Cases">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+    </a>
+    <a class="rail-btn" href="report.html" data-tip="Report">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+    </a>
+    <a class="rail-btn active" href="map.html" data-tip="Map">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 4v16"/><path d="M15 6v16"/></svg>
+    </a>
+    <div class="rail-spacer"></div>
+    <a class="rail-btn" href="connect.html" data-tip="Connect">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+    </a>
+    <a class="rail-btn" href="#" id="profile-btn" data-tip="Log out">
+      <span class="rail-avatar" id="rail-avatar">T</span>
+    </a>
+    <a class="rail-btn" href="settings.html" data-tip="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+    </a>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="back-btn" id="topbar-back" aria-label="Back" title="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      </button>
+      <h1 id="topbar-title">Map</h1>
+    </div>
+    <div class="content">
+      <div id="list-view">
+        <p class="lede">The Map connects everything Talon has researched: click a company to open its full plan, or a dashed node to look into a company that came up as related but hasn't been researched yet.</p>
+        <div class="graph-wrap" id="graph-wrap"></div>
+        <div class="empty-state" id="empty-state">
+          <div class="placeholder-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6l6-2 6 2 6-2v16l-6 2-6-2-6 2z"/><path d="M9 4v16"/><path d="M15 6v16"/></svg>
+          </div>
+          <h2>Nothing to map yet</h2>
+          <p>Look into a company from Home first, then come back here to plan the outreach.</p>
+        </div>
+      </div>
+      <div id="detail-view"></div>
+    </div>
+  </div>
+
+  <script>
+    const isLocalStaticPreview = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      && location.port && location.port !== '8744';
+    const TALON_API = isLocalStaticPreview ? 'http://localhost:8744' : '';
+
+    const talonUser = localStorage.getItem('talon_user');
+    if (!talonUser) {
+      window.location.href = 'signin.html';
+    } else {
+      document.getElementById('rail-avatar').textContent = talonUser.trim().charAt(0).toUpperCase() || 'T';
+    }
+    document.getElementById('profile-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.removeItem('talon_user');
+      localStorage.removeItem('talon_onboarded');
+      window.location.href = 'index.html';
+    });
+
+    function formatDate(ts) {
+      if (!ts) return '';
+      return new Date(ts * 1000).toLocaleString(undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    const BRANCH_ICONS = {
+      contacts: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+      leadership: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>',
+      intent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>',
+      similar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="9" height="9" rx="1.5"/><rect x="11" y="11" width="9" height="9" rx="1.5"/></svg>',
+    };
+
+    function mapBranch(iconKey, label, sub) {
+      const el = document.createElement('div');
+      el.className = 'map-branch';
+      const icon = document.createElement('div');
+      icon.className = 'map-branch-icon';
+      icon.innerHTML = BRANCH_ICONS[iconKey];
+      el.appendChild(icon);
+      const labelEl = document.createElement('div');
+      labelEl.className = 'map-branch-label';
+      labelEl.textContent = label;
+      el.appendChild(labelEl);
+      const subEl = document.createElement('div');
+      subEl.className = 'map-branch-sub';
+      subEl.textContent = sub;
+      el.appendChild(subEl);
+      return el;
+    }
+
+    function renderDiagram(report) {
+      const payload = report.payload || {};
+      const contacts = payload.contacts || {};
+      const profile = payload.profile || {};
+      const intent = payload.intent || {};
+      const routes = payload.routes || [];
+      const similar = payload.similar_companies || [];
+
+      const wrap = document.createElement('div');
+      wrap.className = 'map-diagram';
+
+      const hub = document.createElement('div');
+      hub.className = 'map-hub';
+      const hubIcon = document.createElement('div');
+      hubIcon.className = 'map-hub-icon';
+      hubIcon.innerHTML = '<img src="assets/logo.png" alt="">';
+      hub.appendChild(hubIcon);
+      const hubLabel = document.createElement('div');
+      hubLabel.className = 'map-hub-label';
+      hubLabel.textContent = report.company || report.title;
+      hub.appendChild(hubLabel);
+      wrap.appendChild(hub);
+
+      const branches = document.createElement('div');
+      branches.className = 'map-branches';
+
+      const totalEmails = Object.values(contacts.emails || {}).reduce((n, list) => n + list.length, 0);
+      const totalSocials = Object.keys(contacts.socials || {}).length;
+      branches.appendChild(mapBranch('contacts', 'Contacts',
+        routes.length ? `${routes.length} route${routes.length === 1 ? '' : 's'} ranked` :
+        (totalEmails || totalSocials) ? `${totalEmails} email(s), ${totalSocials} social(s)` : 'none found'));
+
+      const people = (profile.founders || []).length + (profile.decision_makers || []).length;
+      branches.appendChild(mapBranch('leadership', 'Leadership', people ? `${people} name(s) found` : 'none named'));
+
+      const signals = ['hiring', 'funding', 'launch'].filter((k) => intent[k]);
+      branches.appendChild(mapBranch('intent', 'Intent signals', signals.length ? signals.join(', ') : 'none found'));
+
+      branches.appendChild(mapBranch('similar', 'Similar companies', similar.length ? `${similar.length} researched` : 'none researched'));
+
+      wrap.appendChild(branches);
+      return wrap;
+    }
+
+    function mapSection(labelText) {
+      const sec = document.createElement('div');
+      sec.className = 'map-section';
+      const label = document.createElement('div');
+      label.className = 'map-section-label';
+      label.textContent = labelText;
+      sec.appendChild(label);
+      return sec;
+    }
+
+    function mapConnector() {
+      const wrap = document.createElement('div');
+      wrap.className = 'map-connector';
+      wrap.innerHTML =
+        '<svg width="16" height="30" viewBox="0 0 16 30" fill="none">' +
+        '<line x1="8" y1="0" x2="8" y2="20" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="4 4"/>' +
+        '<path d="M2 18l6 7 6-7" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '</svg>';
+      return wrap;
+    }
+
+    function nextStepCard(text, ctaLabel, ctaHref, linkOnly) {
+      const el = document.createElement('div');
+      el.className = 'next-step-card';
+      const textEl = document.createElement('div');
+      textEl.className = 'next-step-text';
+      textEl.textContent = text;
+      el.appendChild(textEl);
+      if (ctaLabel && ctaHref) {
+        const cta = document.createElement('a');
+        cta.className = linkOnly ? 'next-step-link' : 'next-step-cta';
+        cta.href = ctaHref;
+        cta.textContent = ctaLabel;
+        el.appendChild(cta);
+      }
+      return el;
+    }
+
+    function buildNextSteps(report, matchingCase) {
+      const payload = report.payload || {};
+      const routes = payload.routes || [];
+      const steps = [];
+
+      if (matchingCase) {
+        if (matchingCase.status === 'resolved') {
+          steps.push(nextStepCard('This one is resolved, no action needed.', 'View thread', 'cases.html', true));
+        } else if (matchingCase.paused) {
+          steps.push(nextStepCard(`Sent to ${matchingCase.recipient}. Automatic follow-ups are paused for this case.`, 'View thread', 'cases.html', true));
+        } else {
+          const followUpsSent = matchingCase.follow_ups_sent || 0;
+          const text = followUpsSent >= 3
+            ? `Sent to ${matchingCase.recipient}. Talon sent ${followUpsSent} follow-ups with no reply and stopped automatically.`
+            : `Sent to ${matchingCase.recipient}. Talon is watching for a reply and will follow up on its own if it stays quiet.`;
+          steps.push(nextStepCard(text, 'View thread', 'cases.html', true));
+        }
+      } else if (routes.length) {
+        const top = routes[0];
+        const draftTarget = top.type === 'email'
+          ? `Email ${top.label} about `
+          : `Reach out to ${report.company} about `;
+        steps.push(nextStepCard(
+          `Message ${top.label} first, it's the strongest route (${top.confidence} confidence).`,
+          'Draft this now', `home.html?prefill=${encodeURIComponent(draftTarget)}`,
+        ));
+        if (routes.length > 1) {
+          steps.push(nextStepCard(`If that doesn't land, ${routes[1].label} is the next best option.`));
+        }
+        steps.push(nextStepCard('Once you send it, Talon watches the thread and follows up automatically if it goes quiet, no need to check back manually.'));
+      } else {
+        steps.push(nextStepCard(
+          `No contact route found yet for ${report.company}.`,
+          'Try a different angle', `home.html?prefill=${encodeURIComponent(`Find a different way to reach ${report.company}, `)}`,
+        ));
+      }
+      return steps;
+    }
+
+    function buildQuestions(report) {
+      const payload = report.payload || {};
+      const company = report.company || report.title;
+      const routes = payload.routes || [];
+      const intent = payload.intent || {};
+      const similar = payload.similar_companies || [];
+      const questions = [];
+
+      if (!routes.some((r) => r.type === 'application')) {
+        questions.push(`Does ${company} have a partner or support application I'm missing?`);
+      }
+      if (!routes.some((r) => r.type === 'person')) {
+        questions.push(`Who specifically handles this at ${company}?`);
+      }
+      questions.push(`Find a warm introduction path into ${company}`);
+      if (similar.length) {
+        questions.push(`Compare ${company} with ${similar[0].name}`);
+      }
+      if (intent.hiring) {
+        questions.push(`What roles is ${company} hiring for right now?`);
+      }
+      questions.push(`What does ${company} care about most right now?`);
+      return questions.slice(0, 5);
+    }
+
+    function renderQuestions(report) {
+      const wrap = document.createElement('div');
+      wrap.className = 'question-list';
+      buildQuestions(report).forEach((q) => {
+        const chip = document.createElement('a');
+        chip.className = 'question-chip';
+        chip.href = `home.html?prefill=${encodeURIComponent(q)}`;
+        chip.textContent = `${q} →`;
+        wrap.appendChild(chip);
+      });
+      return wrap;
+    }
+
+    function renderHistory(report, allReports) {
+      const company = (report.company || '').toLowerCase();
+      const past = allReports.filter((r) => r.id !== report.id && r.company && r.company.toLowerCase() === company);
+      if (!past.length) return null;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'history-list';
+      past.forEach((r) => {
+        const row = document.createElement('a');
+        row.className = 'history-row';
+        row.href = `map.html?id=${encodeURIComponent(r.id)}`;
+        const query = document.createElement('div');
+        query.className = 'history-query';
+        query.textContent = `"${r.query}"`;
+        row.appendChild(query);
+        const date = document.createElement('div');
+        date.className = 'history-date';
+        date.textContent = formatDate(r.created_at);
+        row.appendChild(date);
+        wrap.appendChild(row);
+      });
+      return wrap;
+    }
+
+    async function renderMap(report, allCases, allReports) {
+      const wrap = document.getElementById('detail-view');
+      wrap.innerHTML = '';
+
+      const header = document.createElement('div');
+      header.className = 'detail-header';
+      const title = document.createElement('div');
+      title.className = 'detail-title';
+      title.textContent = report.company || report.title;
+      header.appendChild(title);
+      const sub = document.createElement('div');
+      sub.className = 'detail-sub';
+      sub.textContent = `From "${report.query}" — ${formatDate(report.created_at)}`;
+      header.appendChild(sub);
+      wrap.appendChild(header);
+
+      wrap.appendChild(renderDiagram(report));
+      wrap.appendChild(mapConnector());
+
+      const matchingCase = allCases.find((c) => c.company && report.company && c.company.toLowerCase() === report.company.toLowerCase());
+
+      const stepsSection = mapSection('Next steps');
+      const stepsList = document.createElement('div');
+      stepsList.className = 'next-step-list';
+      buildNextSteps(report, matchingCase).forEach((el) => stepsList.appendChild(el));
+      stepsSection.appendChild(stepsList);
+      wrap.appendChild(stepsSection);
+      wrap.appendChild(mapConnector());
+
+      const questionsSection = mapSection('Further questions to dig deeper');
+      questionsSection.appendChild(renderQuestions(report));
+      wrap.appendChild(questionsSection);
+
+      const historyEl = renderHistory(report, allReports);
+      if (historyEl) {
+        wrap.appendChild(mapConnector());
+        const historySection = mapSection(`Building on what we've learned about ${report.company || report.title}`);
+        historySection.appendChild(historyEl);
+        wrap.appendChild(historySection);
+      }
+    }
+
+    function showList() {
+      document.getElementById('list-view').style.display = 'block';
+      document.getElementById('detail-view').style.display = 'none';
+      document.getElementById('topbar-title').textContent = 'Map';
+      history.replaceState(null, '', 'map.html');
+      loadList();
+    }
+
+    async function showDetail(id) {
+      try {
+        const [reportRes, casesRes, reportsRes] = await Promise.all([
+          fetch(`${TALON_API}/api/reports/${encodeURIComponent(id)}`),
+          fetch(`${TALON_API}/api/cases`),
+          fetch(`${TALON_API}/api/reports`),
+        ]);
+        const reportData = await reportRes.json();
+        const casesData = await casesRes.json();
+        const reportsData = await reportsRes.json();
+        if (!reportData.report) return;
+        await renderMap(reportData.report, casesData.cases || [], reportsData.reports || []);
+        document.getElementById('list-view').style.display = 'none';
+        document.getElementById('detail-view').style.display = 'block';
+        document.getElementById('topbar-title').textContent = `Map: ${reportData.report.company || reportData.report.title}`;
+        history.replaceState(null, '', `map.html?id=${encodeURIComponent(id)}`);
+      } catch (err) {
+        // stay on whatever's currently shown
+      }
+    }
+
+    // --- Cross-company graph: every researched company is a node, edges
+    // come from similar_companies (already gathered per report). Two tiers,
+    // researched companies on top and companies that only came up as
+    // "similar" but were never looked into directly underneath, so the
+    // whole research history reads as one connected map instead of a flat
+    // list of unrelated report cards.
+
+    function buildGraphModel(reports) {
+      // One node per unique company (case-insensitive), keeping whichever
+      // report on it is most recent as the click target and counting how
+      // many times it's been researched.
+      const byCompany = new Map();
+      reports.forEach((r) => {
+        const company = r.company || r.title;
+        const key = company.toLowerCase();
+        const existing = byCompany.get(key);
+        if (!existing) {
+          byCompany.set(key, { company, reportId: r.id, createdAt: r.created_at, count: 1, payload: r.payload || {} });
+        } else {
+          existing.count += 1;
+          if (r.created_at > existing.createdAt) {
+            existing.reportId = r.id;
+            existing.createdAt = r.created_at;
+            existing.payload = r.payload || {};
+          }
+        }
+      });
+
+      const satellites = new Map();
+      const edges = [];
+      byCompany.forEach((primary, key) => {
+        (primary.payload.similar_companies || []).forEach((s) => {
+          if (!s.name) return;
+          const otherKey = s.name.toLowerCase();
+          if (otherKey === key) return;
+          if (byCompany.has(otherKey)) {
+            edges.push({ from: key, to: otherKey, toType: 'primary' });
+          } else {
+            if (!satellites.has(otherKey)) satellites.set(otherKey, { name: s.name });
+            edges.push({ from: key, to: otherKey, toType: 'satellite' });
+          }
+        });
+      });
+
+      const seen = new Set();
+      const dedupedEdges = edges.filter((e) => {
+        const dedupeKey = e.toType === 'primary' ? [e.from, e.to].sort().join('|') : `${e.from}|${e.to}`;
+        if (seen.has(dedupeKey)) return false;
+        seen.add(dedupeKey);
+        return true;
+      });
+
+      return { primaries: Array.from(byCompany.values()), satellites: Array.from(satellites.values()), edges: dedupedEdges };
+    }
+
+    let _graphResizeTarget = null;
+
+    function graphNode(key, label, subText, extraClass) {
+      const node = document.createElement('div');
+      node.className = `graph-node ${extraClass}`;
+      node.dataset.key = key;
+      node.setAttribute('role', 'button');
+      node.setAttribute('tabindex', '0');
+      node.setAttribute('aria-label', `${label}, ${subText}`);
+      const labelEl = document.createElement('div');
+      labelEl.className = 'graph-node-label';
+      labelEl.textContent = label;
+      node.appendChild(labelEl);
+      const subEl = document.createElement('div');
+      subEl.className = 'graph-node-sub';
+      subEl.textContent = subText;
+      node.appendChild(subEl);
+      node.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          node.click();
+        }
+      });
+      return node;
+    }
+
+    function drawGraphEdges(wrap, svg, edges) {
+      const wrapRect = wrap.getBoundingClientRect();
+      svg.setAttribute('width', wrapRect.width);
+      svg.setAttribute('height', wrapRect.height);
+      svg.innerHTML = '';
+
+      const nodeEls = {};
+      wrap.querySelectorAll('.graph-node').forEach((el) => { nodeEls[el.dataset.key] = el; });
+
+      edges.forEach((e) => {
+        const fromEl = nodeEls[e.from];
+        const toEl = nodeEls[e.to];
+        if (!fromEl || !toEl) return;
+        const fromRect = fromEl.getBoundingClientRect();
+        const toRect = toEl.getBoundingClientRect();
+        const x1 = fromRect.left + fromRect.width / 2 - wrapRect.left;
+        const x2 = toRect.left + toRect.width / 2 - wrapRect.left;
+        let d;
+        if (Math.abs(fromRect.top - toRect.top) < 2) {
+          // Same tier: arc above both nodes, height scales with how far
+          // apart they are so the curve reads clearly instead of looking
+          // like a pinched little hook when nodes sit close together.
+          const y = fromRect.top - wrapRect.top;
+          const arcHeight = Math.min(70, Math.max(30, Math.abs(x2 - x1) * 0.35));
+          const arcY = y - arcHeight;
+          d = `M ${x1} ${y} C ${x1} ${arcY}, ${x2} ${arcY}, ${x2} ${y}`;
+        } else {
+          const topIsFrom = fromRect.top < toRect.top;
+          const y1 = (topIsFrom ? fromRect.bottom : fromRect.top) - wrapRect.top;
+          const y2 = (topIsFrom ? toRect.top : toRect.bottom) - wrapRect.top;
+          const midY = (y1 + y2) / 2;
+          d = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+        }
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.style.fill = 'none';
+        path.style.stroke = 'var(--muted)';
+        path.style.strokeLinecap = 'round';
+        path.style.strokeWidth = e.toType === 'primary' ? '1.7' : '1.5';
+        path.style.opacity = e.toType === 'primary' ? '0.85' : '0.6';
+        if (e.toType === 'satellite') path.style.strokeDasharray = '5 5';
+        svg.appendChild(path);
+      });
+    }
+
+    function renderGraph(reports) {
+      const model = buildGraphModel(reports);
+      const wrap = document.getElementById('graph-wrap');
+      wrap.innerHTML = '';
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('class', 'graph-lines');
+      wrap.appendChild(svg);
+
+      const primaryTier = document.createElement('div');
+      primaryTier.className = 'graph-tier';
+      model.primaries.forEach((p) => {
+        const node = graphNode(
+          p.company.toLowerCase(), p.company,
+          p.count > 1 ? `researched ${p.count}×` : 'researched',
+          'graph-node-primary',
+        );
+        node.addEventListener('click', () => showDetail(p.reportId));
+        primaryTier.appendChild(node);
+      });
+      wrap.appendChild(primaryTier);
+
+      if (model.satellites.length) {
+        const satelliteTier = document.createElement('div');
+        satelliteTier.className = 'graph-tier';
+        model.satellites.forEach((s) => {
+          const node = graphNode(s.name.toLowerCase(), s.name, 'not researched yet', 'graph-node-satellite');
+          node.addEventListener('click', () => {
+            window.location.href = `home.html?prefill=${encodeURIComponent(`Find me a contact at ${s.name}`)}`;
+          });
+          satelliteTier.appendChild(node);
+        });
+        wrap.appendChild(satelliteTier);
+
+        const legend = document.createElement('div');
+        legend.className = 'graph-legend';
+        legend.innerHTML =
+          '<span class="graph-legend-item"><span class="graph-legend-swatch"></span>researched company, similar</span>' +
+          '<span class="graph-legend-item"><span class="graph-legend-swatch dashed"></span>came up as similar, not researched</span>';
+        wrap.appendChild(legend);
+      }
+
+      _graphResizeTarget = { wrap, svg, edges: model.edges };
+      requestAnimationFrame(() => drawGraphEdges(wrap, svg, model.edges));
+    }
+
+    window.addEventListener('resize', () => {
+      if (_graphResizeTarget) drawGraphEdges(_graphResizeTarget.wrap, _graphResizeTarget.svg, _graphResizeTarget.edges);
+    });
+
+    async function loadList() {
+      try {
+        const listRes = await fetch(`${TALON_API}/api/reports`);
+        const listData = await listRes.json();
+        const reportsLight = listData.reports || [];
+        const graphWrap = document.getElementById('graph-wrap');
+        const empty = document.getElementById('empty-state');
+        if (!reportsLight.length) {
+          graphWrap.style.display = 'none';
+          empty.style.display = 'flex';
+          return;
+        }
+        empty.style.display = 'none';
+        graphWrap.style.display = 'block';
+
+        // The list endpoint is lightweight (no similar_companies), fetch
+        // each report's full payload in parallel to build real edges.
+        const details = await Promise.all(reportsLight.map((r) =>
+          fetch(`${TALON_API}/api/reports/${encodeURIComponent(r.id)}`)
+            .then((res) => res.json())
+            .then((d) => d.report)
+            .catch(() => null)
+        ));
+        renderGraph(details.filter(Boolean));
+      } catch (err) {
+        // leave whatever was last rendered
+      }
+    }
+
+    document.getElementById('topbar-back').addEventListener('click', () => {
+      if (document.getElementById('detail-view').style.display === 'block') {
+        showList();
+      } else {
+        history.back();
+      }
+    });
+
+    const params = new URLSearchParams(location.search);
+    const initialId = params.get('id');
+    if (initialId) {
+      document.getElementById('list-view').style.display = 'none';
+      showDetail(initialId);
+    } else {
+      loadList();
+    }
+  </script>
+</body>
+</html>
