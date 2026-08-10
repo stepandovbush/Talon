@@ -67,3 +67,25 @@ def get_report(report_id: str) -> dict | None:
     if report is None:
         return None
     return {**report, "id": report_id}
+
+
+def update_report_findings(report_id: str, payload_updates: dict, change_notes: list[str]) -> None:
+    """Merge freshly re-checked fields (intent signals, similar companies)
+    into an existing report from the background Map-refresh agent. Stamps
+    last_refreshed_at every pass so the Map can show how current the data
+    is, and only appends to the visible "updates" log when something
+    actually changed, change_notes being empty means nothing new was
+    found this cycle, so the log stays quiet rather than noting "checked,
+    no change" every few hours."""
+    with _lock:
+        data = _load()
+        report = data["reports"].get(report_id)
+        if report is None:
+            return
+        report["payload"].update(payload_updates)
+        report["last_refreshed_at"] = time.time()
+        if change_notes:
+            log = report.get("updates") or []
+            log.append({"at": time.time(), "notes": change_notes})
+            report["updates"] = log[-10:]
+        _save(data)

@@ -120,6 +120,22 @@
   .detail-header { margin-bottom: 24px; }
   .detail-title { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
   .detail-sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .refreshed-line { display: flex; align-items: center; gap: 6px; }
+  .refreshed-line::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--online);
+    flex-shrink: 0; animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .whats-new-list { display: flex; flex-direction: column; gap: 8px; }
+  .whats-new-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
+    padding: 10px 13px;
+  }
+  .whats-new-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--online); margin-top: 5px; flex-shrink: 0; }
+  .whats-new-text { font-size: 13px; line-height: 1.5; color: var(--text); }
+  .whats-new-time { font-size: 11px; color: var(--muted); margin-left: 4px; }
 
   /* Flow diagram: a hub node (the company) with dashed lines fanning down
      to what was gathered about it, echoing the architecture-diagram look. */
@@ -237,7 +253,7 @@
     </div>
     <div class="content">
       <div id="list-view">
-        <p class="lede">The Map connects everything Talon has researched: click a company to open its full plan, or a dashed node to look into a company that came up as related but hasn't been researched yet.</p>
+        <p class="lede">The Map connects everything Talon has researched, and keeps working in the background: click a company to open its full plan, or a dashed node to look into a company that came up as related but hasn't been researched yet. Talon rechecks hiring, funding, and related companies on its own, so new signals show up here even if you never ask again.</p>
         <div class="graph-wrap" id="graph-wrap"></div>
         <div class="empty-state" id="empty-state">
           <div class="placeholder-icon">
@@ -268,6 +284,18 @@
       localStorage.removeItem('talon_onboarded');
       window.location.href = 'index.html';
     });
+
+    function timeAgo(ts) {
+      if (!ts) return '';
+      const seconds = Date.now() / 1000 - ts;
+      if (seconds < 90) return 'just now';
+      const minutes = Math.round(seconds / 60);
+      if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+      const hours = Math.round(minutes / 60);
+      if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+      const days = Math.round(hours / 24);
+      return `${days} day${days === 1 ? '' : 's'} ago`;
+    }
 
     function formatDate(ts) {
       if (!ts) return '';
@@ -496,7 +524,36 @@
       sub.className = 'detail-sub';
       sub.textContent = `From "${report.query}" — ${formatDate(report.created_at)}`;
       header.appendChild(sub);
+      if (report.last_refreshed_at) {
+        const refreshedLine = document.createElement('div');
+        refreshedLine.className = 'detail-sub refreshed-line';
+        refreshedLine.textContent = `Talon last checked this in the background ${timeAgo(report.last_refreshed_at)}`;
+        header.appendChild(refreshedLine);
+      }
       wrap.appendChild(header);
+
+      if ((report.updates || []).length) {
+        const updatesSection = mapSection("What Talon found while you were away");
+        const list = document.createElement('div');
+        list.className = 'whats-new-list';
+        [...report.updates].reverse().forEach((entry) => {
+          entry.notes.forEach((noteText) => {
+            const row = document.createElement('div');
+            row.className = 'whats-new-row';
+            const dot = document.createElement('span');
+            dot.className = 'whats-new-dot';
+            row.appendChild(dot);
+            const text = document.createElement('div');
+            text.className = 'whats-new-text';
+            text.innerHTML = `${noteText} <span class="whats-new-time">${timeAgo(entry.at)}</span>`;
+            row.appendChild(text);
+            list.appendChild(row);
+          });
+        });
+        updatesSection.appendChild(list);
+        wrap.appendChild(updatesSection);
+        wrap.appendChild(mapConnector());
+      }
 
       wrap.appendChild(renderDiagram(report));
       wrap.appendChild(mapConnector());

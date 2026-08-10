@@ -16,6 +16,7 @@ import contact_finder
 import github_auth
 import google_auth
 import llm
+import map_agent
 import oauth_connections
 import reports
 import state
@@ -672,7 +673,9 @@ if __name__ == "__main__":
     # Flask's debug reloader re-executes this whole file in a parent
     # "watcher" process before forking the real worker (which carries
     # WERKZEUG_RUN_MAIN=true); only start the listener/scheduler threads in
-    # the actual worker, or double-connecting would double-send follow-ups.
+    # the actual worker, or double-connecting would double-send follow-ups
+    # (and the Map agent would double up its refresh cycles too).
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not is_local_dev:
         _start_background_agent()
+        map_agent.start_background_loop()
     app.run(host="0.0.0.0", port=port, debug=is_local_dev, threaded=True)
