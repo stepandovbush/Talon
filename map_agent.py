@@ -18,7 +18,7 @@ import contact_finder
 import llm
 import reports
 
-REFRESH_INTERVAL_SECONDS = int(os.environ.get("MAP_REFRESH_INTERVAL_SECONDS", 3 * 60 * 60))
+REFRESH_INTERVAL_SECONDS = int(os.environ.get("MAP_REFRESH_INTERVAL_SECONDS") or 3 * 60 * 60)
 # Short delay before the first pass, not a full interval, so a freshly
 # started server shows the agent working within a couple minutes instead
 # of only after the first multi-hour wait.
