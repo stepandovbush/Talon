@@ -430,7 +430,7 @@ def _send_outreach_and_create_case(job_id: str, step, recipient: str, company: s
     step(f"Sending to {recipient} through Caspian")
     try:
         comm, email_connection_id = _get_comm()
-        result = comm.initiate(email_connection_id, recipient, draft["email_text"])
+        comm.initiate(email_connection_id, recipient, draft["email_text"])
     except Exception as exc:
         _job_finish(
             job_id,
@@ -438,8 +438,27 @@ def _send_outreach_and_create_case(job_id: str, step, recipient: str, company: s
         )
         return
 
-    email_conversation_id = result.get("conversation_id") or result.get("id")
+    # initiate()'s own response never carries a conversation id (Caspian
+    # assigns the conversation asynchronously, "queued" is all it returns
+    # immediately), so look it up right after: the one just created is the
+    # newest by created_at on this connection. Without this, every case
+    # got filed under the same None key, silently breaking reply matching,
+    # bot-escalation, and follow-ups for every case ever sent this way.
+    email_conversation_id = None
+    try:
+        conversations = comm.list_conversations(email_connection_id)
+        conversations.sort(key=lambda c: c.get("created_at", ""), reverse=True)
+        if conversations:
+            email_conversation_id = conversations[0]["id"]
+    except Exception:
+        pass
     case_id = f"web:{uuid.uuid4().hex[:8]}"
+    # A real conversation id is what incoming replies key on, but if the
+    # lookup above ever comes back empty, fall back to case_id rather than
+    # storing under a literal None, every case landing under the same key
+    # is worse than reply matching just not working for this one case.
+    if not email_conversation_id:
+        email_conversation_id = case_id
     state.create_case(
         email_conversation_id=email_conversation_id,
         telegram_conversation_id=case_id,

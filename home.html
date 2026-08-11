@@ -1587,11 +1587,17 @@
         // Cases (permission, clarification, mood/style) before it
         // actually goes out, not a fire-and-forget send from here. Record
         // it in history first so it makes sense if the user comes back to
-        // Home later, then jump straight to Cases.
+        // Home later, then show a brief "redirecting" transition (capped
+        // at 2s, not a real wait) before jumping to Cases, so the handoff
+        // reads as deliberate instead of the page just vanishing.
         if (result && result.kind === 'outreach_pending') {
           appendTurn({ role: 'agent', kind: result.kind, data: result }, result.company || null);
           clearActiveJob();
-          window.location.href = `cases.html?pending=${encodeURIComponent(jobId)}`;
+          bubble.classList.remove('typing');
+          bubble.textContent = 'Redirecting you to the case page...';
+          setTimeout(() => {
+            window.location.href = `cases.html?pending=${encodeURIComponent(jobId)}`;
+          }, 1200);
           return;
         }
 
