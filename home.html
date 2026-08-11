@@ -234,6 +234,33 @@
   .typing-dot:nth-child(3) { animation-delay: 0.4s; }
   @keyframes typingBlink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
 
+  /* Full-page transition shown right before handing off to Cases, so the
+     jump reads as a deliberate step, not the page just vanishing. */
+  .redirect-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: var(--bg);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px;
+    animation: redirectFadeIn 0.15s ease;
+  }
+  .redirect-overlay.visible { display: flex; }
+  @keyframes redirectFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .redirect-badge { position: relative; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; }
+  .redirect-badge-glow {
+    position: absolute; inset: -16px;
+    background: radial-gradient(circle, rgba(110,231,183,0.55), transparent 70%);
+    filter: blur(4px); border-radius: 50%;
+  }
+  .redirect-badge-icon {
+    position: relative; width: 50px; height: 50px; border-radius: 15px;
+    background: var(--bg); border: 1px solid var(--border);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .redirect-badge-icon img { width: 21px; height: auto; display: block; }
+  .redirect-text { font-size: 15px; font-weight: 600; color: var(--text); }
+  .redirect-dots { display: flex; gap: 4px; }
+
   .suggested-wrap {
     width: 100%;
     max-height: 130px;
@@ -763,6 +790,15 @@
         </aside>
       </div>
     </div>
+  </div>
+
+  <div class="redirect-overlay" id="redirect-overlay">
+    <div class="redirect-badge">
+      <span class="redirect-badge-glow"></span>
+      <span class="redirect-badge-icon"><img src="assets/logo.png" alt=""></span>
+    </div>
+    <div class="redirect-text" id="redirect-text">Redirecting you to the case page...</div>
+    <div class="redirect-dots"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>
   </div>
 
   <script>
@@ -1594,7 +1630,8 @@
           appendTurn({ role: 'agent', kind: result.kind, data: result }, result.company || null);
           clearActiveJob();
           bubble.classList.remove('typing');
-          bubble.textContent = 'Redirecting you to the case page...';
+          bubble.textContent = `I sent this to Cases for you to confirm sending to ${result.recipient}.`;
+          document.getElementById('redirect-overlay').classList.add('visible');
           setTimeout(() => {
             window.location.href = `cases.html?pending=${encodeURIComponent(jobId)}`;
           }, 1200);
