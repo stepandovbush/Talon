@@ -334,6 +334,7 @@
       </div>
       <div class="nav-actions" id="nav-actions">
         <a class="btn" href="https://github.com/stepandovbush/Talon" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn" href="signin.html" id="nav-signin">Sign in</a>
         <a class="btn primary" href="signup.html" id="nav-signup">Sign up</a>
       </div>
     </nav>
@@ -647,24 +648,18 @@
     }, { threshold: 0.2 });
     cards.forEach((c) => io.observe(c));
 
-    const loggedInUser = localStorage.getItem('talon_user');
-    if (loggedInUser) {
-      const navActions = document.getElementById('nav-actions');
-      navActions.innerHTML =
-        '<a class="btn" href="home.html">Home</a>' +
-        '<a class="btn primary" href="#" id="logout-btn">Log out</a>';
-      document.getElementById('logout-btn').addEventListener('click', (e) => {
-        e.preventDefault();
-        localStorage.removeItem('talon_user');
-        localStorage.removeItem('talon_onboarded');
-        window.location.reload();
-      });
-      const heroSignup = document.getElementById('hero-signup');
-      if (heroSignup) {
-        heroSignup.textContent = 'Go to Home';
-        heroSignup.href = localStorage.getItem('talon_onboarded') ? 'home.html' : 'onboarding.html';
-      }
-    }
+    // The landing page always shows as signed out, even if this browser
+    // has an active session from before, so anyone opening the site sees
+    // Sign up / Sign in and has to actually authenticate, not a leftover
+    // "Home" shortcut from a previous visit or account.
+    const isLocalStaticPreview = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      && location.port && location.port !== '8744';
+    const TALON_API = isLocalStaticPreview ? 'http://localhost:8744' : '';
+
+    localStorage.removeItem('talon_user');
+    localStorage.removeItem('talon_onboarded');
+    localStorage.removeItem('talon_chat_history');
+    fetch(`${TALON_API}/api/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
   </script>
 </body>
 </html>
