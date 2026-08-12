@@ -1,14 +1,16 @@
+import functools
 import os
 import re
+import secrets
 import sqlite3
 import threading
 import time
 import uuid
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from caspian_sdk import CommClient
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, request, send_from_directory
+from flask import Flask, jsonify, redirect, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import agent
@@ -27,9 +29,29 @@ load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "users.db")
+SECRET_KEY_PATH = os.path.join(BASE_DIR, "flask_secret.txt")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+
+def _load_secret_key() -> str:
+    """A stable session-signing key across restarts, without requiring
+    .env setup. Prefers FLASK_SECRET_KEY; otherwise generates one once and
+    persists it locally (gitignored), same pattern as the OAuth token
+    files, so sessions don't invalidate on every reload/redeploy."""
+    env_key = os.environ.get("FLASK_SECRET_KEY")
+    if env_key:
+        return env_key
+    if os.path.exists(SECRET_KEY_PATH):
+        with open(SECRET_KEY_PATH) as f:
+            return f.read().strip()
+    key = secrets.token_hex(32)
+    with open(SECRET_KEY_PATH, "w") as f:
+        f.write(key)
+    return key
+
+
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path="")
+app.secret_key = _load_secret_key()
 
 # Dev-only CORS: the frontend is often previewed from a separate static
 # server (e.g. VS Code Live Server on :5500) while this API runs on :8744.
@@ -45,7 +67,22 @@ def _allow_local_cors(response):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
+
+
+def _current_user() -> str | None:
+    return session.get("user_email")
+
+
+def require_login(view):
+    @functools.wraps(view)
+    def wrapped(*args, **kwargs):
+        if not _current_user():
+            return jsonify(error="Sign in first."), 401
+        return view(*args, **kwargs)
+
+    return wrapped
 
 
 @app.route("/api/<path:_unused>", methods=["OPTIONS"])
@@ -126,6 +163,10 @@ def get_db():
             password_hash TEXT NOT NULL
         )"""
     )
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN provider TEXT DEFAULT 'password'")
+    except sqlite3.OperationalError:
+        pass  # column already added on a previous run
     return conn
 
 
@@ -153,7 +194,7 @@ def signup():
     conn = get_db()
     try:
         conn.execute(
-            "INSERT INTO users (email, password_hash) VALUES (?, ?)",
+            "INSERT INTO users (email, password_hash, provider) VALUES (?, ?, 'password')",
             (email, generate_password_hash(password)),
         )
         conn.commit()
@@ -162,6 +203,7 @@ def signup():
     finally:
         conn.close()
 
+    session["user_email"] = email
     return jsonify(ok=True, email=email)
 
 
@@ -180,7 +222,20 @@ def signin():
     if not row or not check_password_hash(row[0], password):
         return jsonify(error="Incorrect email or password."), 401
 
+    session["user_email"] = email
     return jsonify(ok=True, email=email)
+
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify(ok=True)
+
+
+@app.route("/api/session")
+def session_status():
+    email = _current_user()
+    return jsonify(logged_in=email is not None, email=email)
 
 
 def _job_step(job_id: str, text: str) -> None:
@@ -260,6 +315,7 @@ def _report_title(company: str, want: str) -> str:
 def _run_talon_job(
     job_id: str,
     text: str,
+    user: str,
     context_company: str | None = None,
     resolved_company: str | None = None,
     resolved_domain: str | None = None,
@@ -353,6 +409,7 @@ def _run_talon_job(
                     title=_report_title(company, want),
                     query=text,
                     company=company,
+                    user=user,
                     payload={
                         "contacts": contacts,
                         "profile": profile,
@@ -400,30 +457,28 @@ def _run_talon_job(
                 )
             return
 
-        # Once Gmail is connected, an outreach send is important enough to
-        # confirm first rather than fire immediately, hand off to Cases:
-        # that's where the permission question, clarification, and
-        # mood/style picker live, along with a sidebar to keep chatting
-        # with Talon while deciding. Without Gmail connected, keep the
-        # existing immediate send, unchanged.
-        if google_auth.is_connected():
-            step("Ready to draft, waiting for confirmation on Cases")
-            _job_finish(job_id, {
-                "kind": "outreach_pending",
-                "recipient": recipient,
-                "company": company,
-                "purpose_text": text,
-            })
-            return
-
-        step("Drafting the outreach email")
-        draft = llm.draft_outreach(text, recipient)
-        _send_outreach_and_create_case(job_id, step, recipient, company, draft)
+        # Any outreach send is important enough to confirm first rather
+        # than fire immediately, hand off to Cases every time: that's
+        # where the permission question, clarification, and mood/style
+        # picker live, along with a sidebar to keep chatting with Talon
+        # while deciding. Not conditional on Gmail being connected --
+        # that was only ever about reading personal inbox context, never
+        # about whether a send needs confirming.
+        step("Ready to draft, waiting for confirmation on Cases")
+        _job_finish(job_id, {
+            "kind": "outreach_pending",
+            "recipient": recipient,
+            "company": company,
+            "purpose_text": text,
+        })
+        return
     except Exception as exc:
         _job_finish(job_id, {"kind": "message", "reply": f"Something went wrong: {exc}"})
 
 
-def _send_outreach_and_create_case(job_id: str, step, recipient: str, company: str | None, draft: dict) -> None:
+def _send_outreach_and_create_case(
+    job_id: str, step, recipient: str, company: str | None, draft: dict, user: str,
+) -> None:
     """Shared by both the immediate-send path (no Gmail connected) and the
     confirmed-on-Cases path: actually send through Caspian and open a case
     to track it. Finishes the job either way, success or failure."""
@@ -440,18 +495,33 @@ def _send_outreach_and_create_case(job_id: str, step, recipient: str, company: s
 
     # initiate()'s own response never carries a conversation id (Caspian
     # assigns the conversation asynchronously, "queued" is all it returns
-    # immediately), so look it up right after: the one just created is the
-    # newest by created_at on this connection. Without this, every case
-    # got filed under the same None key, silently breaking reply matching,
-    # bot-escalation, and follow-ups for every case ever sent this way.
+    # immediately), so look it up right after via the event log, which also
+    # carries customer_id. That second id matters: Caspian mints a brand
+    # new conversation_id for every inbound reply instead of keeping it on
+    # this thread, so conversation_id alone can't match a reply back to its
+    # case later, customer_id is the one thing that stays stable per
+    # contact. Without either of these, every case got filed under the
+    # same None key, silently breaking reply matching for every case ever
+    # sent this way.
     email_conversation_id = None
-    try:
-        conversations = comm.list_conversations(email_connection_id)
-        conversations.sort(key=lambda c: c.get("created_at", ""), reverse=True)
-        if conversations:
-            email_conversation_id = conversations[0]["id"]
-    except Exception:
-        pass
+    customer_id = None
+    for attempt in range(5):
+        try:
+            recent = comm.events(limit=25, type="message.sent")
+            recent.sort(key=lambda e: e.get("occurred_at", ""), reverse=True)
+            for event in recent:
+                data = event.get("data") or {}
+                msg = data.get("message") or {}
+                addresses = [r.get("address") for r in (msg.get("recipients") or [])]
+                if recipient in addresses:
+                    email_conversation_id = msg.get("conversation_id")
+                    customer_id = data.get("customer_id")
+                    break
+        except Exception:
+            break
+        if email_conversation_id:
+            break
+        time.sleep(0.6)
     case_id = f"web:{uuid.uuid4().hex[:8]}"
     # A real conversation id is what incoming replies key on, but if the
     # lookup above ever comes back empty, fall back to case_id rather than
@@ -467,6 +537,8 @@ def _send_outreach_and_create_case(job_id: str, step, recipient: str, company: s
         channel="web",
         subject=draft.get("subject"),
         company=company,
+        customer_id=customer_id,
+        user=user,
     )
     step("Done")
     _job_finish(
@@ -483,7 +555,7 @@ def _send_outreach_and_create_case(job_id: str, step, recipient: str, company: s
 
 def _run_confirm_outreach_job(
     job_id: str, recipient: str, company: str | None, purpose_text: str,
-    clarification: str, style: dict,
+    clarification: str, style: dict, user: str,
 ) -> None:
     """The Cases-side confirmation flow's actual work: draft with the
     user's chosen mood/style and any clarification they added, then send
@@ -492,12 +564,13 @@ def _run_confirm_outreach_job(
     try:
         step("Drafting with your chosen style")
         draft = llm.draft_outreach_styled(purpose_text, recipient, clarification, style)
-        _send_outreach_and_create_case(job_id, step, recipient, company, draft)
+        _send_outreach_and_create_case(job_id, step, recipient, company, draft, user)
     except Exception as exc:
         _job_finish(job_id, {"kind": "message", "reply": f"Something went wrong: {exc}"})
 
 
 @app.route("/api/talon/confirm_outreach", methods=["POST"])
+@require_login
 def talon_confirm_outreach():
     data = request.get_json(force=True, silent=True) or {}
     recipient = (data.get("recipient") or "").strip()
@@ -507,19 +580,21 @@ def talon_confirm_outreach():
     purpose_text = (data.get("purpose_text") or "").strip()
     clarification = (data.get("clarification") or "").strip()
     style = data.get("style") or {}
+    user = _current_user()
 
     job_id = uuid.uuid4().hex[:12]
     with _jobs_lock:
-        _jobs[job_id] = {"steps": [], "done": False, "result": None}
+        _jobs[job_id] = {"steps": [], "done": False, "result": None, "user": user}
     threading.Thread(
         target=_run_confirm_outreach_job,
-        args=(job_id, recipient, company, purpose_text, clarification, style),
+        args=(job_id, recipient, company, purpose_text, clarification, style, user),
         daemon=True,
     ).start()
     return jsonify(job_id=job_id)
 
 
 @app.route("/api/talon/start", methods=["POST"])
+@require_login
 def talon_start():
     data = request.get_json(force=True, silent=True) or {}
     text = (data.get("text") or "").strip()
@@ -528,35 +603,42 @@ def talon_start():
     context_company = (data.get("context_company") or "").strip() or None
     resolved_company = (data.get("resolved_company") or "").strip() or None
     resolved_domain = (data.get("resolved_domain") or "").strip() or None
+    user = _current_user()
 
     job_id = uuid.uuid4().hex[:12]
     with _jobs_lock:
-        _jobs[job_id] = {"steps": [], "done": False, "result": None}
+        _jobs[job_id] = {"steps": [], "done": False, "result": None, "user": user}
     threading.Thread(
         target=_run_talon_job,
-        args=(job_id, text, context_company, resolved_company, resolved_domain),
+        args=(job_id, text, user, context_company, resolved_company, resolved_domain),
         daemon=True,
     ).start()
     return jsonify(job_id=job_id)
 
 
 @app.route("/api/talon/status/<job_id>")
+@require_login
 def talon_status(job_id):
     with _jobs_lock:
         job = _jobs.get(job_id)
         if job is None:
             return jsonify(error="Unknown job"), 404
+        if job.get("user") != _current_user():
+            return jsonify(error="Unknown job"), 404
         return jsonify(steps=job["steps"], done=job["done"], result=job["result"])
 
 
 @app.route("/api/cases")
+@require_login
 def list_cases():
-    return jsonify(cases=state.list_cases(), now=time.time())
+    return jsonify(cases=state.list_cases(user=_current_user()), now=time.time())
 
 
 @app.route("/api/cases/<case_id>/schedule", methods=["POST"])
+@require_login
 def update_case_schedule(case_id):
-    if state.get_case(case_id) is None:
+    case = state.get_case(case_id)
+    if case is None or case.get("user") != _current_user():
         return jsonify(error="Unknown case"), 404
     data = request.get_json(force=True, silent=True) or {}
     state.set_schedule(case_id, follow_up_hours=data.get("follow_up_hours"), paused=data.get("paused"))
@@ -564,42 +646,108 @@ def update_case_schedule(case_id):
 
 
 @app.route("/api/reports")
+@require_login
 def list_reports():
-    return jsonify(reports=reports.list_reports())
+    return jsonify(reports=reports.list_reports(user=_current_user()))
 
 
 @app.route("/api/reports/<report_id>")
+@require_login
 def get_report(report_id):
     report = reports.get_report(report_id)
-    if report is None:
+    if report is None or report.get("user") != _current_user():
         return jsonify(error="Unknown report"), 404
     return jsonify(report=report)
 
 
-@app.route("/api/google-signup", methods=["POST"])
-def google_signup():
-    # Real Google sign-in needs a Google Cloud OAuth Client ID, which only
-    # you can create (it requires your own Google account). Set
-    # GOOGLE_OAUTH_CLIENT_ID in .env and wire up the redirect flow here
-    # once you have one. Until then this is an honest stub, not a fake pass.
-    return (
-        jsonify(
-            error="Google sign-in isn't connected yet. It needs a Google OAuth "
-            "Client ID. Use email + password for now."
-        ),
-        501,
+_google_account_state = None
+
+
+def _google_account_redirect_uri() -> str:
+    # Derived from the incoming request rather than an env var, so this
+    # works on both localhost and Render without extra config beyond
+    # adding this exact URL to the OAuth client's Authorized redirect URIs
+    # in Google Cloud Console.
+    return f"{request.host_url.rstrip('/')}/api/google/account/callback"
+
+
+@app.route("/api/google/account/start")
+def google_account_start():
+    """Real 'Sign in with Google' for account identity -- who you are,
+    not what Talon can read. Reuses the same OAuth client as the
+    Gmail-connect feature (google_auth.py) with a different scope and its
+    own state/redirect pair, so the two flows can't collide."""
+    if not google_auth.is_configured():
+        return (
+            jsonify(
+                error="Google sign-in isn't connected yet. It needs a Google OAuth "
+                "Client ID (the same one used for Gmail-connect works). Set "
+                "GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET in .env, and "
+                "add this deployment's callback URL to that client's Authorized "
+                "redirect URIs in Google Cloud Console. Use email + password for now."
+            ),
+            501,
+        )
+    global _google_account_state
+    _google_account_state = uuid.uuid4().hex
+    return redirect(
+        google_auth.build_auth_url(
+            _google_account_state,
+            scope=google_auth.ACCOUNT_SCOPE,
+            redirect_uri_value=_google_account_redirect_uri(),
+        )
     )
+
+
+@app.route("/api/google/account/callback")
+def google_account_callback():
+    global _google_account_state
+    error = request.args.get("error")
+    if error:
+        return redirect(f"/signin.html?error={error}")
+
+    code = request.args.get("code")
+    returned_state = request.args.get("state")
+    if not code or not returned_state or returned_state != _google_account_state:
+        return redirect("/signin.html?error=invalid_state")
+    _google_account_state = None
+
+    try:
+        tokens = google_auth.exchange_code(code, redirect_uri_value=_google_account_redirect_uri())
+        userinfo = google_auth.get_userinfo(tokens["access_token"])
+        email = (userinfo.get("email") or "").strip().lower()
+        if not email:
+            raise ValueError("Google didn't return an email address")
+    except Exception:
+        return redirect("/signin.html?error=google_signin_failed")
+
+    conn = get_db()
+    row = conn.execute("SELECT email FROM users WHERE email = ?", (email,)).fetchone()
+    is_new = row is None
+    if is_new:
+        conn.execute(
+            "INSERT INTO users (email, password_hash, provider) VALUES (?, ?, 'google')",
+            (email, generate_password_hash(uuid.uuid4().hex)),
+        )
+        conn.commit()
+    conn.close()
+
+    session["user_email"] = email
+    destination = "onboarding.html" if is_new else "home.html"
+    return redirect(f"/{destination}?welcome={quote(email)}")
 
 
 _google_oauth_state = None
 
 
 @app.route("/api/google/status")
+@require_login
 def google_status():
-    return jsonify(configured=google_auth.is_configured(), connected=google_auth.is_connected())
+    return jsonify(configured=google_auth.is_configured(), connected=google_auth.is_connected(_current_user()))
 
 
 @app.route("/api/google/connect")
+@require_login
 def google_connect():
     if not google_auth.is_configured():
         return (
@@ -624,6 +772,10 @@ def google_connect():
 @app.route("/api/google/callback")
 def google_callback():
     global _google_oauth_state
+    user = _current_user()
+    if not user:
+        return redirect("/connect.html?gmail=error&reason=signed_out")
+
     error = request.args.get("error")
     if error:
         return redirect(f"/connect.html?gmail=error&reason={error}")
@@ -636,7 +788,7 @@ def google_callback():
 
     try:
         tokens = google_auth.exchange_code(code)
-        google_auth.save_from_code_exchange(tokens)
+        google_auth.save_from_code_exchange(user, tokens)
     except Exception:
         return redirect("/connect.html?gmail=error&reason=token_exchange_failed")
 
@@ -644,39 +796,45 @@ def google_callback():
 
 
 @app.route("/api/google/disconnect", methods=["POST"])
+@require_login
 def google_disconnect():
-    google_auth.disconnect()
+    google_auth.disconnect(_current_user())
     return jsonify(ok=True)
 
 
 @app.route("/api/github/status")
+@require_login
 def github_status():
-    profile = github_auth.get_profile()
+    profile = github_auth.get_profile(_current_user())
     return jsonify(connected=profile is not None, username=(profile or {}).get("username"))
 
 
 @app.route("/api/github/connect", methods=["POST"])
+@require_login
 def github_connect_route():
     data = request.get_json(force=True, silent=True) or {}
     token = (data.get("token") or "").strip()
     if not token:
         return jsonify(error="Paste a token first."), 400
     try:
-        profile = github_auth.save_token(token)
+        profile = github_auth.save_token(_current_user(), token)
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
     return jsonify(ok=True, username=profile.get("username"))
 
 
 @app.route("/api/github/disconnect", methods=["POST"])
+@require_login
 def github_disconnect():
-    github_auth.disconnect()
+    github_auth.disconnect(_current_user())
     return jsonify(ok=True)
 
 
 # Slack and LinkedIn both use the same OAuth 2.0 authorization-code shape
 # (oauth_connections.py), one small route set per provider so the URLs
 # stay predictable, but sharing all the actual logic.
+# Keyed by "{provider}:{user_email}" so two different accounts connecting
+# the same provider at once don't stomp each other's pending state.
 _oauth_pending: dict[str, str] = {}
 
 _PROVIDER_UNCONFIGURED_NOTES = {
@@ -706,44 +864,52 @@ _PROVIDER_UNCONFIGURED_NOTES = {
 
 def _register_oauth_routes(provider: str) -> None:
     @app.route(f"/api/{provider}/status", endpoint=f"{provider}_status")
+    @require_login
     def _status():
         return jsonify(
             configured=oauth_connections.is_configured(provider),
-            connected=oauth_connections.is_connected(provider),
+            connected=oauth_connections.is_connected(provider, _current_user()),
         )
 
     @app.route(f"/api/{provider}/connect", endpoint=f"{provider}_connect")
+    @require_login
     def _connect():
         if not oauth_connections.is_configured(provider):
             return jsonify(error=_PROVIDER_UNCONFIGURED_NOTES[provider]), 501
         state = uuid.uuid4().hex
-        _oauth_pending[provider] = state
+        _oauth_pending[f"{provider}:{_current_user()}"] = state
         return redirect(oauth_connections.build_auth_url(provider, state))
 
     @app.route(f"/api/{provider}/callback", endpoint=f"{provider}_callback")
     def _callback():
+        user = _current_user()
+        if not user:
+            return redirect(f"/connect.html?{provider}=error&reason=signed_out")
+
         error = request.args.get("error")
         if error:
             return redirect(f"/connect.html?{provider}=error&reason={error}")
 
         code = request.args.get("code")
         returned_state = request.args.get("state")
-        pending_state = _oauth_pending.get(provider)
+        pending_key = f"{provider}:{user}"
+        pending_state = _oauth_pending.get(pending_key)
         if not code or not pending_state or returned_state != pending_state:
             return redirect(f"/connect.html?{provider}=error&reason=invalid_state")
-        _oauth_pending.pop(provider, None)
+        _oauth_pending.pop(pending_key, None)
 
         try:
             tokens = oauth_connections.exchange_code(provider, code)
-            oauth_connections.save_from_code_exchange(provider, tokens)
+            oauth_connections.save_from_code_exchange(provider, user, tokens)
         except Exception:
             return redirect(f"/connect.html?{provider}=error&reason=token_exchange_failed")
 
         return redirect(f"/connect.html?{provider}=connected")
 
     @app.route(f"/api/{provider}/disconnect", methods=["POST"], endpoint=f"{provider}_disconnect")
+    @require_login
     def _disconnect():
-        oauth_connections.disconnect(provider)
+        oauth_connections.disconnect(provider, _current_user())
         return jsonify(ok=True)
 
 

@@ -170,6 +170,12 @@
 
 
   <script>
+    // Same origin split as home.html: only a local static preview (e.g.
+    // Live Server on :5500) needs the API pointed at :8744 explicitly.
+    const isLocalStaticPreview = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      && location.port && location.port !== '8744';
+    const TALON_API = isLocalStaticPreview ? 'http://localhost:8744' : '';
+
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const submitBtn = document.getElementById('submit-btn');
@@ -196,19 +202,33 @@
       window.location.href = localStorage.getItem('talon_onboarded') ? 'home.html' : 'onboarding.html';
     }
 
-    // Demo mode: no account database is checked here, so this doesn't
-    // persist or verify a real password. It just gets you through the
-    // flow. Real Google OAuth needs a Client ID from your own Google
-    // Cloud project, so this signs you in with a placeholder identity
-    // instead of a real Google account.
     googleBtn.addEventListener('click', () => {
-      enterApp('google-user@talonagent.dev');
+      window.location.href = `${TALON_API}/api/google/account/start`;
     });
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (submitBtn.disabled) return;
-      enterApp(emailInput.value.trim());
+      errorText.textContent = '';
+      submitBtn.disabled = true;
+      try {
+        const res = await fetch(`${TALON_API}/api/signin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email: emailInput.value.trim(), password: passwordInput.value }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errorText.textContent = data.error || 'Something went wrong, try again.';
+          submitBtn.disabled = false;
+          return;
+        }
+        enterApp(data.email);
+      } catch (err) {
+        errorText.textContent = `Couldn't reach Talon's backend (${err.message}).`;
+        submitBtn.disabled = false;
+      }
     });
   </script>
 </body>

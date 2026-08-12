@@ -149,7 +149,7 @@
 
   <div class="main">
     <div class="topbar">
-      <button class="back-btn" onclick="history.back()" aria-label="Back" title="Back">
+      <button class="back-btn" onclick="window.location.href='home.html'" aria-label="Back" title="Back">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
       </button>
       <h1>Settings</h1>
@@ -172,14 +172,42 @@
   </div>
 
   <script>
+    // Same backend-origin detection as home.html: only a local static
+    // preview (e.g. Live Server on :5500) needs the API pointed at :8744
+    // explicitly, everywhere else (served by server.py directly, including
+    // a real deployment) a relative path is same-origin and correct.
+    const isLocalStaticPreview = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      && location.port && location.port !== '8744';
+    const TALON_API = isLocalStaticPreview ? 'http://localhost:8744' : '';
+
+    // localStorage alone isn't proof of a real login (stale from before
+    // real accounts existed, or a signed-out session on this browser) --
+    // confirm with the backend's actual session cookie and bounce to
+    // signin if it disagrees, before an API call fails deep in the page
+    // with a confusing error.
+    async function verifyRealSession() {
+      try {
+        const res = await fetch(`${TALON_API}/api/session`, { credentials: 'include' });
+        const data = await res.json();
+        if (!data.logged_in) {
+          localStorage.removeItem('talon_user');
+          window.location.href = 'signin.html';
+        }
+      } catch (err) {
+        // connectivity issue, not an auth one -- leave it to surface where it happens
+      }
+    }
+
     const talonUser = localStorage.getItem('talon_user');
     if (!talonUser) {
       window.location.href = 'signin.html';
     } else {
+      verifyRealSession();
       document.getElementById('rail-avatar').textContent = talonUser.trim().charAt(0).toUpperCase() || 'T';
       document.getElementById('account-email').textContent = talonUser;
     }
     function logout() {
+      fetch(`${TALON_API}/api/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
       localStorage.removeItem('talon_user');
       localStorage.removeItem('talon_onboarded');
       window.location.href = 'index.html';

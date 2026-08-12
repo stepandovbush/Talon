@@ -109,8 +109,8 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    padding: 24px 24px 40px;
+    align-items: stretch;
+    padding: 24px 32px 40px;
     position: relative;
     overflow: hidden;
   }
@@ -143,7 +143,7 @@
 
   /* Hero ask */
   .hero-ask {
-    width: 100%; max-width: 640px;
+    width: 100%; max-width: 100%;
     height: calc(100vh - 130px);
     min-height: 420px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -189,7 +189,7 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 26px;
     flex-grow: 0;
     min-height: 0;
     opacity: 0;
@@ -197,7 +197,13 @@
     padding: 4px 2px;
     transition: flex-grow 0.45s ease, opacity 0.35s ease, margin 0.35s ease;
   }
-  .chat-mode .agent-chat { flex-grow: 1; opacity: 1; margin-bottom: 20px; overflow-y: auto; }
+  .chat-mode .agent-chat {
+    flex-grow: 1; opacity: 1; margin-bottom: 20px; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .chat-mode .agent-chat::-webkit-scrollbar { width: 6px; }
+  .chat-mode .agent-chat::-webkit-scrollbar-track { background: transparent; }
+  .chat-mode .agent-chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
   .chat-msg { display: flex; gap: 9px; align-items: flex-end; }
   .chat-msg.user { flex-direction: row-reverse; }
   .chat-avatar-mini {
@@ -208,7 +214,7 @@
   }
   .chat-avatar-mini img { width: 13px; height: auto; display: block; }
   .chat-bubble {
-    max-width: 78%;
+    max-width: 100%;
     text-align: left;
     padding: 10px 14px;
     border-radius: 14px;
@@ -218,7 +224,14 @@
     background: var(--panel);
     color: var(--text);
   }
+  .chat-msg.agent {
+    width: 100%;
+  }
+  .chat-msg.agent .chat-bubble {
+    flex: 1 1 auto;
+  }
   .chat-msg.user .chat-bubble {
+    max-width: 78%;
     background: var(--accent);
     color: #fff;
     border-bottom-left-radius: 14px;
@@ -346,17 +359,15 @@
   .workspace {
     display: flex;
     width: 100%;
-    max-width: 640px;
+    max-width: 100%;
     height: calc(100vh - 130px);
     min-height: 420px;
     gap: 18px;
     align-items: stretch;
     position: relative;
     z-index: 1;
-    transition: max-width 0.4s ease;
   }
-  .workspace.panel-open { max-width: 1000px; }
-  .workspace .hero-ask { flex: 1 1 640px; min-width: 0; max-width: 640px; margin: 0 auto; height: auto; }
+  .workspace .hero-ask { flex: 1 1 auto; min-width: 0; max-width: 100%; margin: 0 auto; height: auto; }
 
   .agent-panel {
     flex: 0 0 0px;
@@ -1489,6 +1500,7 @@
         const startRes = await fetch(`${TALON_API}/api/talon/start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ text: query, resolved_company: candidate.name, resolved_domain: candidate.domain || '' }),
         });
         const startData = await startRes.json();
@@ -1612,7 +1624,7 @@
       try {
         let result = null;
         while (true) {
-          const statusRes = await fetch(`${TALON_API}/api/talon/status/${jobId}`);
+          const statusRes = await fetch(`${TALON_API}/api/talon/status/${jobId}`, { credentials: 'include' });
           const statusData = await statusRes.json();
           renderAgentSteps(statusData.steps || [], statusData.done);
           if (statusData.done) { result = statusData.result; break; }
@@ -1671,6 +1683,7 @@
         const startRes = await fetch(`${TALON_API}/api/talon/start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ text, context_company: loadTranscript().lastCompany }),
         });
         const startData = await startRes.json();
@@ -1705,10 +1718,38 @@
     }
     checkBackend();
 
+    // Coming back from a real Google sign-in redirect: pick up the
+    // confirmed account email before the login-gate check below runs.
+    const welcomeEmail = new URLSearchParams(location.search).get('welcome');
+    if (welcomeEmail) {
+      localStorage.setItem('talon_user', welcomeEmail);
+      history.replaceState(null, '', 'home.html');
+    }
+
+    // localStorage alone isn't proof of a real login (a stale value from
+    // before real accounts existed, or from a signed-out session on this
+    // browser, would still pass this check) -- confirm with the backend's
+    // actual session cookie, and bounce to signin if it disagrees, before
+    // any API call fails deep inside a chat send with a confusing error.
+    async function verifyRealSession() {
+      try {
+        const res = await fetch(`${TALON_API}/api/session`, { credentials: 'include' });
+        const data = await res.json();
+        if (!data.logged_in) {
+          localStorage.removeItem('talon_user');
+          window.location.href = 'signin.html';
+        }
+      } catch (err) {
+        // Backend unreachable is already surfaced by checkBackend() above;
+        // don't also bounce to signin over a connectivity blip.
+      }
+    }
+
     const talonUser = localStorage.getItem('talon_user');
     if (!talonUser) {
       window.location.href = 'signin.html';
     } else {
+      verifyRealSession();
       const cleanUser = talonUser.trim();
       document.getElementById('rail-avatar').textContent = cleanUser.charAt(0).toUpperCase() || 'T';
 
@@ -1757,8 +1798,10 @@
     document.getElementById('new-chat-btn').addEventListener('click', startNewChat);
 
     function logout() {
+      fetch(`${TALON_API}/api/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
       localStorage.removeItem('talon_user');
       localStorage.removeItem('talon_onboarded');
+      localStorage.removeItem(TRANSCRIPT_KEY);
       window.location.href = 'index.html';
     }
     document.getElementById('profile-btn').addEventListener('click', (e) => {

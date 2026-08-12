@@ -1,10 +1,13 @@
 """GitHub connection via a personal access token, not OAuth.
 
-Unlike Gmail/Outlook/LinkedIn/X, GitHub's REST API works fine with a token
-the user generates themselves in two clicks (Settings > Developer settings
-> Personal access tokens > Generate new token, no scopes needed for public
-read access), no app registration or approval process required. Same
-single-user, local-file storage pattern as the other connections.
+Unlike Gmail/Slack/LinkedIn, GitHub's REST API works fine with a token the
+user generates themselves in two clicks (Settings > Developer settings >
+Personal access tokens > Generate new token, no scopes needed for public
+read access), no app registration or approval process required.
+
+Per-user, local-file storage: github_token.json (gitignored) holds a
+{user_email: token data} map, one entry per Talon account that's pasted
+a token in.
 """
 
 import json
@@ -18,23 +21,34 @@ TOKEN_PATH = os.path.join(BASE_DIR, "github_token.json")
 HEADERS_BASE = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
 
 
-def is_connected() -> bool:
-    return os.path.exists(TOKEN_PATH)
-
-
-def get_profile() -> dict | None:
+def _load_all() -> dict:
     if not os.path.exists(TOKEN_PATH):
-        return None
+        return {}
     with open(TOKEN_PATH) as f:
         return json.load(f)
 
 
-def disconnect() -> None:
-    if os.path.exists(TOKEN_PATH):
-        os.remove(TOKEN_PATH)
+def _save_all(data: dict) -> None:
+    with open(TOKEN_PATH, "w") as f:
+        json.dump(data, f, indent=2)
 
 
-def save_token(token: str) -> dict:
+def is_connected(user_id: str) -> bool:
+    return user_id in _load_all()
+
+
+def get_profile(user_id: str) -> dict | None:
+    return _load_all().get(user_id)
+
+
+def disconnect(user_id: str) -> None:
+    data = _load_all()
+    if user_id in data:
+        del data[user_id]
+        _save_all(data)
+
+
+def save_token(user_id: str, token: str) -> dict:
     """Validate the token against GitHub's own API before storing it, so a
     typo or expired token fails loudly here instead of silently later.
     Raises ValueError with a clear, honest reason on rejection."""
@@ -56,6 +70,7 @@ def save_token(token: str) -> dict:
         "name": profile.get("name"),
         "saved_at": time.time(),
     }
-    with open(TOKEN_PATH, "w") as f:
-        json.dump(data, f, indent=2)
+    all_data = _load_all()
+    all_data[user_id] = data
+    _save_all(all_data)
     return data

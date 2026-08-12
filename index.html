@@ -302,8 +302,10 @@
     justify-content: center;
     color: var(--muted);
     font-size: 13px;
+    overflow: hidden;
     background: repeating-linear-gradient(135deg, var(--bg), var(--bg) 10px, var(--panel) 10px, var(--panel) 11px);
   }
+  .screen-body img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
 
   .stack { display: flex; gap: 10px; flex-wrap: wrap; }
   .chip { border: 1px solid var(--border); color: var(--muted); font-size: 13px; padding: 7px 14px; border-radius: 999px; background: var(--panel); }
@@ -602,22 +604,22 @@
         <div class="grid2">
           <div>
             <h3>Talon Chat</h3>
-            <p>Where you talk to your agent and watch it work in real time.</p>
+            <p>Tell it who to reach and why. It researches out loud, step by step, in a live panel next to the conversation, so you're never staring at a spinner wondering what it's actually doing.</p>
           </div>
           <div>
-            <h3>Talon Home</h3>
-            <p>Where you manage cases, channels, and history.</p>
+            <h3>Talon Cases</h3>
+            <p>Every message it sends becomes a tracked case: who, what was asked, and where it stands. Talon keeps following up and escalating past bots on its own until a real person replies.</p>
           </div>
         </div>
       </div>
       <div class="views-panel">
         <div class="screen">
           <div class="screen-bar"><span></span><span></span><span></span></div>
-          <div class="screen-body">Screenshot coming soon, work in progress</div>
+          <div class="screen-body"><img src="assets/index-views-chat.png" alt="Talon researching a company live, with each step listed in a side panel as it happens"></div>
         </div>
         <div class="screen">
           <div class="screen-bar"><span></span><span></span><span></span></div>
-          <div class="screen-body">Screenshot coming soon, work in progress</div>
+          <div class="screen-body"><img src="assets/index-views-cases.png" alt="The Cases tab listing tracked outreach threads with reply status and follow-up dates"></div>
         </div>
       </div>
     </section>

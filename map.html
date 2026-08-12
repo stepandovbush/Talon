@@ -272,14 +272,34 @@
       && location.port && location.port !== '8744';
     const TALON_API = isLocalStaticPreview ? 'http://localhost:8744' : '';
 
+    // localStorage alone isn't proof of a real login (stale from before
+    // real accounts existed, or a signed-out session on this browser) --
+    // confirm with the backend's actual session cookie and bounce to
+    // signin if it disagrees, before an API call fails deep in the page
+    // with a confusing error.
+    async function verifyRealSession() {
+      try {
+        const res = await fetch(`${TALON_API}/api/session`, { credentials: 'include' });
+        const data = await res.json();
+        if (!data.logged_in) {
+          localStorage.removeItem('talon_user');
+          window.location.href = 'signin.html';
+        }
+      } catch (err) {
+        // connectivity issue, not an auth one -- leave it to surface where it happens
+      }
+    }
+
     const talonUser = localStorage.getItem('talon_user');
     if (!talonUser) {
       window.location.href = 'signin.html';
     } else {
+      verifyRealSession();
       document.getElementById('rail-avatar').textContent = talonUser.trim().charAt(0).toUpperCase() || 'T';
     }
     document.getElementById('profile-btn').addEventListener('click', (e) => {
       e.preventDefault();
+      fetch(`${TALON_API}/api/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
       localStorage.removeItem('talon_user');
       localStorage.removeItem('talon_onboarded');
       window.location.href = 'index.html';
@@ -592,9 +612,9 @@
     async function showDetail(id) {
       try {
         const [reportRes, casesRes, reportsRes] = await Promise.all([
-          fetch(`${TALON_API}/api/reports/${encodeURIComponent(id)}`),
-          fetch(`${TALON_API}/api/cases`),
-          fetch(`${TALON_API}/api/reports`),
+          fetch(`${TALON_API}/api/reports/${encodeURIComponent(id)}`, { credentials: 'include' }),
+          fetch(`${TALON_API}/api/cases`, { credentials: 'include' }),
+          fetch(`${TALON_API}/api/reports`, { credentials: 'include' }),
         ]);
         const reportData = await reportRes.json();
         const casesData = await casesRes.json();
@@ -788,7 +808,7 @@
 
     async function loadList() {
       try {
-        const listRes = await fetch(`${TALON_API}/api/reports`);
+        const listRes = await fetch(`${TALON_API}/api/reports`, { credentials: 'include' });
         const listData = await listRes.json();
         const reportsLight = listData.reports || [];
         const graphWrap = document.getElementById('graph-wrap');
@@ -804,7 +824,7 @@
         // The list endpoint is lightweight (no similar_companies), fetch
         // each report's full payload in parallel to build real edges.
         const details = await Promise.all(reportsLight.map((r) =>
-          fetch(`${TALON_API}/api/reports/${encodeURIComponent(r.id)}`)
+          fetch(`${TALON_API}/api/reports/${encodeURIComponent(r.id)}`, { credentials: 'include' })
             .then((res) => res.json())
             .then((d) => d.report)
             .catch(() => null)
@@ -819,7 +839,7 @@
       if (document.getElementById('detail-view').style.display === 'block') {
         showList();
       } else {
-        history.back();
+        window.location.href = 'home.html';
       }
     });
 

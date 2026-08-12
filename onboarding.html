@@ -179,7 +179,16 @@
     const nextBtn = document.getElementById('next-btn');
     let current = 0;
 
-    // No account database yet, anyone reaching onboarding directly
+    // Coming back from a real Google sign-in redirect: pick up the
+    // confirmed account email and drop the query param, before anything
+    // else below can fall back to a guest placeholder.
+    const welcomeEmail = new URLSearchParams(location.search).get('welcome');
+    if (welcomeEmail) {
+      localStorage.setItem('talon_user', welcomeEmail);
+      history.replaceState(null, '', 'onboarding.html');
+    }
+
+    // Anyone reaching onboarding directly (no signup/signin/Google flow)
     // still gets a placeholder local user so Home doesn't bounce them.
     if (!localStorage.getItem('talon_user')) {
       localStorage.setItem('talon_user', 'guest');

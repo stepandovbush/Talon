@@ -30,6 +30,8 @@ def create_case(
     channel: str = "web",
     subject: str | None = None,
     company: str | None = None,
+    customer_id: str | None = None,
+    user: str | None = None,
 ) -> None:
     now = time.time()
     with _lock:
@@ -40,6 +42,8 @@ def create_case(
             "subject": subject,
             "company": company,
             "channel": channel,
+            "customer_id": customer_id,
+            "user": user,
             "status": "awaiting_reply",
             "history": [{"role": "talon", "text": opening_email, "at": now}],
             "created_at": now,
@@ -53,6 +57,26 @@ def create_case(
 
 def get_case(email_conversation_id: str) -> dict | None:
     return _load()["cases"].get(email_conversation_id)
+
+
+def find_open_case_by_customer(customer_id: str | None) -> tuple[str, dict] | None:
+    """Caspian mints a fresh conversation_id for every inbound reply instead
+    of keeping it on the original send's thread, so a reply can't be matched
+    by conversation_id the way the case was keyed at creation. customer_id
+    stays stable per real-world contact, so fall back to the most recently
+    active still-open case for that customer."""
+    if not customer_id:
+        return None
+    data = _load()
+    matches = [
+        (case_id, case)
+        for case_id, case in data["cases"].items()
+        if case.get("customer_id") == customer_id and case.get("status") == "awaiting_reply"
+    ]
+    if not matches:
+        return None
+    matches.sort(key=lambda pair: pair[1].get("last_activity_at", 0), reverse=True)
+    return matches[0]
 
 
 def _next_follow_up_at(case: dict) -> float | None:
@@ -70,12 +94,16 @@ def _next_follow_up_at(case: dict) -> float | None:
     return case.get("last_activity_at", 0) + hours * 3600
 
 
-def list_cases() -> list[dict]:
+def list_cases(user: str | None = None) -> list[dict]:
     """All cases with their id embedded and next follow-up time computed,
-    most recently active first."""
+    most recently active first. Filtered to one account's own cases when
+    user is given -- omit it for the background scheduler/listener, which
+    correctly need to see every user's cases."""
     data = _load()
     cases = []
     for case_id, case in data["cases"].items():
+        if user is not None and case.get("user") != user:
+            continue
         cases.append({**case, "id": case_id, "next_follow_up_at": _next_follow_up_at(case)})
     cases.sort(key=lambda c: c.get("last_activity_at", 0), reverse=True)
     return cases

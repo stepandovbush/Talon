@@ -15,21 +15,30 @@ def handle_company_reply(client, message) -> None:
     """React to an inbound email from a company on an existing case: detect
     a canned bot reply and escalate with firmer language, or recognize a
     real person / resolution and close the case out."""
-    case = state.get_case(message.conversation_id)
+    case_id = message.conversation_id
+    case = state.get_case(case_id)
+    if not case:
+        # Caspian assigns a brand-new conversation_id to every inbound
+        # reply instead of keeping it on the original send's thread, so a
+        # direct lookup misses every real reply. customer_id is the one
+        # thing that stays stable per contact, fall back to it.
+        found = state.find_open_case_by_customer(getattr(message, "customer_id", None))
+        if found:
+            case_id, case = found
     if not case or case["status"] == "resolved":
         return
 
-    state.append_history(message.conversation_id, "company", message.text or "")
-    case = state.get_case(message.conversation_id)
+    state.append_history(case_id, "company", message.text or "")
+    case = state.get_case(case_id)
 
     verdict = llm.evaluate_reply(state.history_text(case))
 
     if verdict.get("next_email_text") and not verdict.get("resolved"):
         message.reply(verdict["next_email_text"])
-        state.append_history(message.conversation_id, "talon", verdict["next_email_text"])
+        state.append_history(case_id, "talon", verdict["next_email_text"])
 
     if verdict.get("resolved") or not verdict.get("is_bot"):
-        state.mark_resolved(message.conversation_id)
+        state.mark_resolved(case_id)
         _notify_user(client, case, verdict.get("user_update", "Update on your case: a real person responded."))
 
     _relay_findings_to_map(case, verdict.get("findings") or [])
@@ -46,7 +55,7 @@ def _relay_findings_to_map(case: dict, findings: list[str]) -> None:
     company = case.get("company")
     if not company:
         return
-    report_id = reports.find_latest_report_id_by_company(company)
+    report_id = reports.find_latest_report_id_by_company(company, user=case.get("user"))
     if not report_id:
         return
     reports.update_report_findings(report_id, {}, findings)

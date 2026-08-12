@@ -1,7 +1,7 @@
 """OAuth connections for Slack and LinkedIn.
 
-Same single-user, local-file token pattern as google_auth.py -- one
-person's own accounts, no multi-user system. Each of these needs its own
+Same per-user, local-file token pattern as google_auth.py: each provider's
+token file holds a {user_email: tokens} map. Each of these needs its own
 OAuth app registered on that platform's own developer portal (Slack API,
 LinkedIn Developers), which only the account owner can create, that's a
 one-time setup only the user can do themselves, same as Gmail. Until the
@@ -105,40 +105,51 @@ def exchange_code(provider: str, code: str) -> dict:
     return result
 
 
-def _load(provider: str) -> dict | None:
+def _load_all(provider: str) -> dict:
     path = _tokens_path(provider)
     if not os.path.exists(path):
-        return None
+        return {}
     with open(path) as f:
         return json.load(f)
 
 
-def _save(provider: str, tokens: dict) -> None:
+def _save_all(provider: str, data: dict) -> None:
     with open(_tokens_path(provider), "w") as f:
-        json.dump(tokens, f, indent=2)
+        json.dump(data, f, indent=2)
 
 
-def save_from_code_exchange(provider: str, payload: dict) -> None:
+def _load(provider: str, user_id: str) -> dict | None:
+    return _load_all(provider).get(user_id)
+
+
+def _save(provider: str, user_id: str, tokens: dict) -> None:
+    data = _load_all(provider)
+    data[user_id] = tokens
+    _save_all(provider, data)
+
+
+def save_from_code_exchange(provider: str, user_id: str, payload: dict) -> None:
     payload = dict(payload)
     payload["obtained_at"] = time.time()
-    _save(provider, payload)
+    _save(provider, user_id, payload)
 
 
-def is_connected(provider: str) -> bool:
-    return _load(provider) is not None
+def is_connected(provider: str, user_id: str) -> bool:
+    return _load(provider, user_id) is not None
 
 
-def disconnect(provider: str) -> None:
-    path = _tokens_path(provider)
-    if os.path.exists(path):
-        os.remove(path)
+def disconnect(provider: str, user_id: str) -> None:
+    data = _load_all(provider)
+    if user_id in data:
+        del data[user_id]
+        _save_all(provider, data)
 
 
-def get_valid_access_token(provider: str) -> str | None:
+def get_valid_access_token(provider: str, user_id: str) -> str | None:
     """The current access token, refreshing it first if expired. Returns
     None if never connected or the refresh fails (refresh token revoked,
     or the provider didn't grant one)."""
-    tokens = _load(provider)
+    tokens = _load(provider, user_id)
     if tokens is None:
         return None
     expires_in = tokens.get("expires_in")
@@ -170,5 +181,5 @@ def get_valid_access_token(provider: str) -> str | None:
     if refreshed.get("refresh_token"):
         tokens["refresh_token"] = refreshed["refresh_token"]
     tokens["obtained_at"] = time.time()
-    _save(provider, tokens)
+    _save(provider, user_id, tokens)
     return tokens.get("access_token")

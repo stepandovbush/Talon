@@ -270,7 +270,7 @@
 
   <div class="main">
     <div class="topbar">
-      <button class="back-btn" onclick="history.back()" aria-label="Back" title="Back">
+      <button class="back-btn" onclick="window.location.href='home.html'" aria-label="Back" title="Back">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
       </button>
       <h1>Cases</h1>
@@ -312,14 +312,34 @@
       && location.port && location.port !== '8744';
     const TALON_API = isLocalStaticPreview ? 'http://localhost:8744' : '';
 
+    // localStorage alone isn't proof of a real login (stale from before
+    // real accounts existed, or a signed-out session on this browser) --
+    // confirm with the backend's actual session cookie and bounce to
+    // signin if it disagrees, before an API call fails deep in the page
+    // with a confusing error.
+    async function verifyRealSession() {
+      try {
+        const res = await fetch(`${TALON_API}/api/session`, { credentials: 'include' });
+        const data = await res.json();
+        if (!data.logged_in) {
+          localStorage.removeItem('talon_user');
+          window.location.href = 'signin.html';
+        }
+      } catch (err) {
+        // connectivity issue, not an auth one -- leave it to surface where it happens
+      }
+    }
+
     const talonUser = localStorage.getItem('talon_user');
     if (!talonUser) {
       window.location.href = 'signin.html';
     } else {
+      verifyRealSession();
       document.getElementById('rail-avatar').textContent = talonUser.trim().charAt(0).toUpperCase() || 'T';
     }
     document.getElementById('profile-btn').addEventListener('click', (e) => {
       e.preventDefault();
+      fetch(`${TALON_API}/api/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
       localStorage.removeItem('talon_user');
       localStorage.removeItem('talon_onboarded');
       window.location.href = 'index.html';
@@ -418,7 +438,7 @@
 
     async function loadCases() {
       try {
-        const res = await fetch(`${TALON_API}/api/cases`);
+        const res = await fetch(`${TALON_API}/api/cases`, { credentials: 'include' });
         const data = await res.json();
         renderCases(data.cases || []);
       } catch (err) {
@@ -505,7 +525,7 @@
       try {
         let result = null;
         while (true) {
-          const res = await fetch(`${TALON_API}/api/talon/status/${jobId}`);
+          const res = await fetch(`${TALON_API}/api/talon/status/${jobId}`, { credentials: 'include' });
           const data = await res.json();
           if (data.done) { result = data.result; break; }
           await new Promise((r) => setTimeout(r, 500));
@@ -537,6 +557,7 @@
         const startRes = await fetch(`${TALON_API}/api/talon/start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ text, context_company: loadTranscript().lastCompany || '' }),
         });
         const startData = await startRes.json();
@@ -666,6 +687,7 @@
           const res = await fetch(`${TALON_API}/api/talon/confirm_outreach`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
               recipient: result.recipient,
               company: result.company,
@@ -682,7 +704,7 @@
           const data = await res.json();
           if (!data.job_id) throw new Error(data.error || 'failed to start');
           while (true) {
-            const statusRes = await fetch(`${TALON_API}/api/talon/status/${data.job_id}`);
+            const statusRes = await fetch(`${TALON_API}/api/talon/status/${data.job_id}`, { credentials: 'include' });
             const statusData = await statusRes.json();
             const steps = statusData.steps || [];
             if (steps.length) statusEl.textContent = steps[steps.length - 1];
@@ -725,7 +747,7 @@
       const jobId = params.get('pending');
       if (!jobId) return;
       try {
-        const res = await fetch(`${TALON_API}/api/talon/status/${jobId}`);
+        const res = await fetch(`${TALON_API}/api/talon/status/${jobId}`, { credentials: 'include' });
         const data = await res.json();
         if (data.done && data.result && data.result.kind === 'outreach_pending') {
           showPendingCard(data.result, jobId);

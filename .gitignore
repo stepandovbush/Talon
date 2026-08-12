@@ -10,3 +10,4 @@ google_tokens.json
 slack_tokens.json
 linkedin_tokens.json
 github_token.json
+flask_secret.txt

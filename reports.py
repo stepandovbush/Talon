@@ -25,7 +25,7 @@ def _save(data: dict) -> None:
         json.dump(data, f, indent=2)
 
 
-def create_report(title: str, query: str, company: str | None, payload: dict) -> str:
+def create_report(title: str, query: str, company: str | None, payload: dict, user: str | None = None) -> str:
     """Save a full report. `payload` is the entire intelligence bundle
     (contacts, profile, intent, suggestions, similar companies) -- the list
     view only ever reads the lightweight fields, the detail view reads all
@@ -37,6 +37,7 @@ def create_report(title: str, query: str, company: str | None, payload: dict) ->
             "title": title,
             "query": query,
             "company": company,
+            "user": user,
             "created_at": time.time(),
             "payload": payload,
         }
@@ -44,12 +45,16 @@ def create_report(title: str, query: str, company: str | None, payload: dict) ->
     return report_id
 
 
-def list_reports() -> list[dict]:
+def list_reports(user: str | None = None) -> list[dict]:
     """Lightweight list for the Report tab's index: title, date, company --
-    not the full payload, so the list stays cheap to load."""
+    not the full payload, so the list stays cheap to load. Filtered to one
+    account's own reports when user is given -- omit it for the background
+    Map-refresh loop, which correctly needs to see every user's reports."""
     data = _load()
     reports = []
     for report_id, report in data["reports"].items():
+        if user is not None and report.get("user") != user:
+            continue
         reports.append({
             "id": report_id,
             "title": report["title"],
@@ -69,11 +74,13 @@ def get_report(report_id: str) -> dict | None:
     return {**report, "id": report_id}
 
 
-def find_latest_report_id_by_company(company: str) -> str | None:
+def find_latest_report_id_by_company(company: str, user: str | None = None) -> str | None:
     """The most recent report on a company, by name, case-insensitive --
     used to route a finding from a live case (a reply revealed something
     new) to the right place on the Map, without the caller needing to
-    already know the report id."""
+    already know the report id. Filtered to the case's own user when
+    given, so a finding from one account's outreach can't land on a
+    different account's report for the same company name."""
     if not company:
         return None
     data = _load()
@@ -81,6 +88,7 @@ def find_latest_report_id_by_company(company: str) -> str | None:
         (report_id, report["created_at"])
         for report_id, report in data["reports"].items()
         if (report.get("company") or "").strip().lower() == company.strip().lower()
+        and (user is None or report.get("user") == user)
     ]
     if not matches:
         return None
