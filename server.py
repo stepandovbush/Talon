@@ -1,4 +1,5 @@
 import functools
+import hashlib
 import os
 import re
 import secrets
@@ -35,12 +36,21 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 def _load_secret_key() -> str:
     """A stable session-signing key across restarts, without requiring
-    .env setup. Prefers FLASK_SECRET_KEY; otherwise generates one once and
-    persists it locally (gitignored), same pattern as the OAuth token
-    files, so sessions don't invalidate on every reload/redeploy."""
+    .env setup. Prefers FLASK_SECRET_KEY; otherwise derives one from
+    CASPIAN_API_KEY, which is already a real, persistent env var on any
+    deployment of this app (it can't run without one), so this stays
+    stable across a redeploy even on a host like Render whose filesystem
+    gets wiped on every deploy. A locally-generated random key would
+    silently log out every signed-in session on every push, since the
+    file it was saved to never survives to the next deploy. Only falls
+    back to that local-file random key if neither env var is set, which
+    in practice means local dev without a .env at all."""
     env_key = os.environ.get("FLASK_SECRET_KEY")
     if env_key:
         return env_key
+    caspian_key = os.environ.get("CASPIAN_API_KEY")
+    if caspian_key:
+        return hashlib.sha256(f"talon-flask-secret:{caspian_key}".encode()).hexdigest()
     if os.path.exists(SECRET_KEY_PATH):
         with open(SECRET_KEY_PATH) as f:
             return f.read().strip()
