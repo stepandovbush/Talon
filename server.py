@@ -670,9 +670,6 @@ def get_report(report_id):
     return jsonify(report=report)
 
 
-_google_account_state = None
-
-
 def _google_account_redirect_uri() -> str:
     # Derived from the incoming request rather than an env var, so this
     # works on both localhost and Render without extra config beyond
@@ -698,11 +695,16 @@ def google_account_start():
             ),
             501,
         )
-    global _google_account_state
-    _google_account_state = uuid.uuid4().hex
+    # Kept in the session cookie, not a module-level global: a bare global
+    # is shared by every visitor, so two people starting this flow around
+    # the same time (or a dev-server reload landing between the request
+    # that starts it and the one Google redirects back to) would stomp on
+    # each other's in-flight state and fail with invalid_state every time.
+    state_token = uuid.uuid4().hex
+    session["google_account_state"] = state_token
     return redirect(
         google_auth.build_auth_url(
-            _google_account_state,
+            state_token,
             scope=google_auth.ACCOUNT_SCOPE,
             redirect_uri_value=_google_account_redirect_uri(),
         )
@@ -711,16 +713,15 @@ def google_account_start():
 
 @app.route("/api/google/account/callback")
 def google_account_callback():
-    global _google_account_state
     error = request.args.get("error")
     if error:
         return redirect(f"/signin.html?error={error}")
 
     code = request.args.get("code")
     returned_state = request.args.get("state")
-    if not code or not returned_state or returned_state != _google_account_state:
+    expected_state = session.pop("google_account_state", None)
+    if not code or not returned_state or returned_state != expected_state:
         return redirect("/signin.html?error=invalid_state")
-    _google_account_state = None
 
     try:
         tokens = google_auth.exchange_code(code, redirect_uri_value=_google_account_redirect_uri())
@@ -747,9 +748,6 @@ def google_account_callback():
     return redirect(f"/{destination}?welcome={quote(email)}")
 
 
-_google_oauth_state = None
-
-
 @app.route("/api/google/status")
 @require_login
 def google_status():
@@ -774,14 +772,13 @@ def google_connect():
             ),
             501,
         )
-    global _google_oauth_state
-    _google_oauth_state = uuid.uuid4().hex
-    return redirect(google_auth.build_auth_url(_google_oauth_state))
+    state_token = uuid.uuid4().hex
+    session["google_oauth_state"] = state_token
+    return redirect(google_auth.build_auth_url(state_token))
 
 
 @app.route("/api/google/callback")
 def google_callback():
-    global _google_oauth_state
     user = _current_user()
     if not user:
         return redirect("/connect.html?gmail=error&reason=signed_out")
@@ -792,9 +789,9 @@ def google_callback():
 
     code = request.args.get("code")
     returned_state = request.args.get("state")
-    if not code or not returned_state or returned_state != _google_oauth_state:
+    expected_state = session.pop("google_oauth_state", None)
+    if not code or not returned_state or returned_state != expected_state:
         return redirect("/connect.html?gmail=error&reason=invalid_state")
-    _google_oauth_state = None
 
     try:
         tokens = google_auth.exchange_code(code)
@@ -843,10 +840,6 @@ def github_disconnect():
 # Slack and LinkedIn both use the same OAuth 2.0 authorization-code shape
 # (oauth_connections.py), one small route set per provider so the URLs
 # stay predictable, but sharing all the actual logic.
-# Keyed by "{provider}:{user_email}" so two different accounts connecting
-# the same provider at once don't stomp each other's pending state.
-_oauth_pending: dict[str, str] = {}
-
 _PROVIDER_UNCONFIGURED_NOTES = {
     "slack": (
         "Slack isn't connected yet, this button can't finish the OAuth flow "
@@ -886,9 +879,9 @@ def _register_oauth_routes(provider: str) -> None:
     def _connect():
         if not oauth_connections.is_configured(provider):
             return jsonify(error=_PROVIDER_UNCONFIGURED_NOTES[provider]), 501
-        state = uuid.uuid4().hex
-        _oauth_pending[f"{provider}:{_current_user()}"] = state
-        return redirect(oauth_connections.build_auth_url(provider, state))
+        state_token = uuid.uuid4().hex
+        session[f"oauth_state_{provider}"] = state_token
+        return redirect(oauth_connections.build_auth_url(provider, state_token))
 
     @app.route(f"/api/{provider}/callback", endpoint=f"{provider}_callback")
     def _callback():
@@ -902,11 +895,9 @@ def _register_oauth_routes(provider: str) -> None:
 
         code = request.args.get("code")
         returned_state = request.args.get("state")
-        pending_key = f"{provider}:{user}"
-        pending_state = _oauth_pending.get(pending_key)
-        if not code or not pending_state or returned_state != pending_state:
+        expected_state = session.pop(f"oauth_state_{provider}", None)
+        if not code or not expected_state or returned_state != expected_state:
             return redirect(f"/connect.html?{provider}=error&reason=invalid_state")
-        _oauth_pending.pop(pending_key, None)
 
         try:
             tokens = oauth_connections.exchange_code(provider, code)

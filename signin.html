@@ -184,6 +184,22 @@
     const googleBtn = document.getElementById('google-btn');
     const form = document.getElementById('signin-form');
 
+    // Google sign-in redirects back here with ?error=... on any failure
+    // (denied consent, a stale state after a server restart mid-flow,
+    // token exchange failing), silently landing on a blank form otherwise
+    // looked like nothing happened, so people just retried the same
+    // button and hit the same failure again.
+    const GOOGLE_ERROR_MESSAGES = {
+      invalid_state: "That Google sign-in link expired before you got back, try clicking Sign in with Google again.",
+      google_signin_failed: "Google sign-in didn't go through, try again in a moment.",
+      access_denied: "Google sign-in was cancelled.",
+    };
+    const urlError = new URLSearchParams(location.search).get('error');
+    if (urlError) {
+      errorText.textContent = GOOGLE_ERROR_MESSAGES[urlError] || `Google sign-in failed (${urlError}), try again.`;
+      history.replaceState(null, '', 'signin.html');
+    }
+
     function validate() {
       const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim());
       const passOk = passwordInput.value.length > 0;
